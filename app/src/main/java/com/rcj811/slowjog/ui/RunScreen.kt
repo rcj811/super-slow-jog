@@ -120,12 +120,7 @@ fun RunScreen(run: RunState) {
 @Composable
 private fun ActiveRun(run: RunState, s: Settings) {
     val ctx = LocalContext.current
-    var phase by remember { mutableDoubleStateOf(0.0) }
     val moving = run.phase == Phase.RUNNING
-    LaunchedEffect(Unit) {
-        while (true) withFrameNanos { if (BeatClock.active) phase = BeatClock.phase() }
-    }
-    val pulse = if (moving) beatPulse(phase) else 0f
     var confirmStop by remember { mutableStateOf(false) }
     val landscape = isLandscape()
 
@@ -143,8 +138,6 @@ private fun ActiveRun(run: RunState, s: Settings) {
     val done = bannerFor * Settings.REMINDER_EVERY_MIN
     val bannerText = "🎉 已完成 $done 分鐘・還剩 ${run.targetMin - done} 分鐘"
 
-    val pausedBlink = rememberInfiniteTransition(label = "paused")
-    val blink by pausedBlink.animateFloat(0.45f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "blink")
 
     val onStop: () -> Unit = { if (run.phase == Phase.COUNTDOWN) JogService.send(ctx, JogService.ACTION_STOP) else confirmStop = true }
 
@@ -153,14 +146,14 @@ private fun ActiveRun(run: RunState, s: Settings) {
             .fillMaxSize()
             .background(JogColors.Bg)
             .drawBehind {
-                // 隨節拍呼吸的背景光暈
+                // 固定的背景光暈（不隨節拍變化）
                 val c = if (landscape) Offset(size.height * 0.5f + 16.dp.toPx(), size.height / 2)
                 else Offset(size.width / 2, size.height * 0.36f)
                 val base = if (landscape) size.height else size.width
                 drawCircle(
                     Brush.radialGradient(
-                        listOf(JogColors.Sun2.copy(alpha = 0.10f + 0.10f * pulse), Color.Transparent),
-                        center = c, radius = base * (0.75f + 0.04f * pulse),
+                        listOf(JogColors.Sun2.copy(alpha = 0.10f), Color.Transparent),
+                        center = c, radius = base * 0.75f,
                     ),
                     radius = base, center = c,
                 )
@@ -176,7 +169,7 @@ private fun ActiveRun(run: RunState, s: Settings) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RingArea(
-                    run, s, phase, pulse, moving, blink,
+                    run, s, moving,
                     Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true),
                 )
                 Spacer(Modifier.width(20.dp))
@@ -187,12 +180,8 @@ private fun ActiveRun(run: RunState, s: Settings) {
                 ) {
                     RunHeader(run, s)
                     StatsCard(run)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        FootRow(phase, pulse, moving)
-                        Spacer(Modifier.width(24.dp))
-                        CadenceControl(run)
-                    }
-                    Controls(run, pulse, compact = true, onStop = onStop)
+                    CadenceControl(run)
+                    Controls(run, compact = true, onStop = onStop)
                 }
             }
             Box(
@@ -213,15 +202,13 @@ private fun ActiveRun(run: RunState, s: Settings) {
                 Box(Modifier.fillMaxWidth().height(52.dp), contentAlignment = Alignment.Center) {
                     MilestoneBanner(showBanner, bannerText)
                 }
-                RingArea(run, s, phase, pulse, moving, blink, Modifier.fillMaxWidth(0.86f).aspectRatio(1f))
-                Spacer(Modifier.height(10.dp))
-                FootRow(phase, pulse, moving)
-                Spacer(Modifier.height(12.dp))
+                RingArea(run, s, moving, Modifier.fillMaxWidth(0.86f).aspectRatio(1f))
+                Spacer(Modifier.height(16.dp))
                 StatsCard(run)
                 Spacer(Modifier.height(10.dp))
                 CadenceControl(run)
                 Spacer(Modifier.weight(1f))
-                Controls(run, pulse, compact = false, onStop = onStop)
+                Controls(run, compact = false, onStop = onStop)
                 Spacer(Modifier.height(18.dp))
             }
         }
@@ -281,11 +268,11 @@ private fun RunHeader(run: RunState, s: Settings) {
 
 /** 進度圓環 + 原地跑角色 + 剩餘時間（大小隨可用空間縮放） */
 @Composable
-private fun RingArea(run: RunState, s: Settings, phase: Double, pulse: Float, moving: Boolean, blink: Float, modifier: Modifier) {
+private fun RingArea(run: RunState, s: Settings, moving: Boolean, modifier: Modifier) {
     BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
         val w = maxWidth
         val small = w < 280.dp
-        ProgressRing(run, pulse, Modifier.fillMaxSize())
+        ProgressRing(run, Modifier.fillMaxSize())
         when (run.phase) {
             Phase.COUNTDOWN -> CountdownCenter(run.countdown, small)
             else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -294,7 +281,7 @@ private fun RingArea(run: RunState, s: Settings, phase: Double, pulse: Float, mo
                     Modifier.size(w * 0.5f),
                     moving = moving,
                     cadence = run.cadence,
-                    phaseSource = { if (BeatClock.active) phase else null },
+                    phaseSource = { if (BeatClock.active) BeatClock.phase() else null },
                 )
                 Text(
                     Format.clock(run.remainingMs / 1000),
@@ -304,21 +291,10 @@ private fun RingArea(run: RunState, s: Settings, phase: Double, pulse: Float, mo
                 Text(
                     if (run.phase == Phase.PAUSED) "已暫停" else "剩餘時間",
                     style = MaterialTheme.typography.labelLarge,
-                    color = if (run.phase == Phase.PAUSED) JogColors.Sun1.copy(alpha = blink) else JogColors.Muted,
+                    color = if (run.phase == Phase.PAUSED) JogColors.Sun1 else JogColors.Muted,
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun FootRow(phase: Double, pulse: Float, moving: Boolean) {
-    val idx = floor(phase).toLong()
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("左", color = JogColors.Faint, style = MaterialTheme.typography.labelMedium)
-        FootprintDot(if (moving && idx % 2 == 0L) pulse else 0f, JogColors.Sun1, Modifier.size(width = 22.dp, height = 30.dp))
-        FootprintDot(if (moving && idx % 2 != 0L) pulse else 0f, JogColors.Sun3, Modifier.size(width = 22.dp, height = 30.dp).padding(top = 4.dp))
-        Text("右", color = JogColors.Faint, style = MaterialTheme.typography.labelMedium)
     }
 }
 
@@ -350,9 +326,8 @@ private fun CadenceControl(run: RunState) {
 }
 
 @Composable
-private fun Controls(run: RunState, pulse: Float, compact: Boolean, onStop: () -> Unit) {
+private fun Controls(run: RunState, compact: Boolean, onStop: () -> Unit) {
     val ctx = LocalContext.current
-    val moving = run.phase == Phase.RUNNING
     val side = if (compact) 54.dp else 64.dp
     val main = if (compact) 74.dp else 88.dp
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(28.dp)) {
@@ -366,11 +341,9 @@ private fun Controls(run: RunState, pulse: Float, compact: Boolean, onStop: () -
             contentAlignment = Alignment.Center,
         ) { GlyphIcon(Glyph.STOP, JogColors.Text, Modifier.size(side * 0.4f)) }
 
-        val playScale by animateFloatAsState(if (moving) 1f + 0.04f * pulse else 1f, label = "play")
         Box(
             Modifier
                 .size(main)
-                .scale(playScale)
                 .clip(CircleShape)
                 .background(JogColors.sunrise)
                 .clickable(enabled = run.phase != Phase.COUNTDOWN) {
@@ -404,8 +377,8 @@ private fun MilestoneBanner(visible: Boolean, text: String) {
 }
 
 @Composable
-private fun ProgressRing(run: RunState, pulse: Float, modifier: Modifier) {
-    val progress by animateFloatAsState(run.progress, tween(400, easing = LinearEasing), label = "progress")
+private fun ProgressRing(run: RunState, modifier: Modifier) {
+    val progress = run.progress
     Canvas(modifier) {
         val stroke = size.minDimension * 0.045f
         val inset = stroke * 1.6f
@@ -415,11 +388,6 @@ private fun ProgressRing(run: RunState, pulse: Float, modifier: Modifier) {
         val center = Offset(size.width / 2, size.height / 2)
         val r = d / 2
 
-        // 節拍光環
-        drawCircle(
-            JogColors.Sun2.copy(alpha = 0.22f * pulse), r + stroke * (1.2f + 0.6f * pulse), center,
-            style = Stroke(stroke * 0.5f),
-        )
         // 底環
         drawArc(JogColors.SurfaceHigh, 0f, 360f, false, topLeft, arcSize, style = Stroke(stroke))
         // 進度

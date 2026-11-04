@@ -9,7 +9,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,7 +28,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,8 +51,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rcj811.slowjog.Prefs
 import com.rcj811.slowjog.ScreenMode
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @Composable
@@ -82,7 +81,10 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** 圓形 ± 按鈕，按住會連續調整 */
+/**
+ * 圓形 ± 按鈕：點一下調一格，按住會連續調整。
+ * 放開、按鈕停用或離開畫面時，連續調整一定會停止。
+ */
 @Composable
 fun RepeatButton(
     symbol: String,
@@ -92,28 +94,35 @@ fun RepeatButton(
     enabled: Boolean = true,
 ) {
     val step by rememberUpdatedState(onStep)
-    val scope = rememberCoroutineScope()
-    val interaction = remember { MutableInteractionSource() }
+    val isEnabled by rememberUpdatedState(enabled)
     Box(
         modifier
             .size(size)
             .clip(CircleShape)
             .background(if (enabled) JogColors.SurfaceHigh else JogColors.Surface)
             .border(1.dp, JogColors.Line, CircleShape)
-            .pointerInput(enabled) {
-                if (!enabled) return@pointerInput
-                awaitEachGesture {
-                    awaitFirstDown()
-                    step()
-                    var job: Job? = scope.launch {
-                        delay(420)
-                        var d = 110L
-                        while (true) {
-                            step(); delay(d); d = (d * 0.9).toLong().coerceAtLeast(45)
+            .pointerInput(Unit) {
+                coroutineScope {
+                    awaitEachGesture {
+                        awaitFirstDown()
+                        if (isEnabled) {
+                            step()
+                            val repeater = launch {
+                                delay(450)
+                                var d = 140L
+                                while (isActive && isEnabled) {
+                                    step()
+                                    delay(d)
+                                    d = (d * 0.88).toLong().coerceAtLeast(60)
+                                }
+                            }
+                            try {
+                                waitForUpOrCancellation()
+                            } finally {
+                                repeater.cancel()
+                            }
                         }
                     }
-                    waitForUpOrCancellation()
-                    job?.cancel(); job = null
                 }
             },
         contentAlignment = Alignment.Center,
