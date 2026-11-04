@@ -245,21 +245,37 @@ private fun ActiveRun(run: RunState, s: Settings) {
 
 @Composable
 private fun RunHeader(run: RunState, s: Settings) {
+    val ctx = LocalContext.current
+    var showVolume by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text("超慢跑", style = MaterialTheme.typography.titleMedium, color = JogColors.Text)
-            Text("目標 ${Format.minutes(run.targetMin)}", style = MaterialTheme.typography.bodyMedium, color = JogColors.Muted)
+            Text(
+                "目標 ${Format.minutes(run.targetMin)}・${s.beatSound.label}聲",
+                style = MaterialTheme.typography.bodyMedium, color = JogColors.Muted, maxLines = 1,
+            )
         }
         ScreenModeChip()
         Spacer(Modifier.width(8.dp))
-        Box(
+        Row(
             Modifier
                 .clip(RoundedCornerShape(50))
-                .background(JogColors.SurfaceHigh)
-                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .background(JogColors.Sun2.copy(alpha = 0.16f))
+                .border(1.dp, JogColors.Sun2.copy(alpha = 0.5f), RoundedCornerShape(50))
+                .clickable { showVolume = true }
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("♪ ${s.beatSound.label}", color = JogColors.Muted, style = MaterialTheme.typography.labelMedium)
+            GlyphIcon(Glyph.SOUND, JogColors.Sun1, Modifier.size(18.dp))
+            Spacer(Modifier.width(4.dp))
+            Text("${Math.round(s.volume * 100)}%", color = JogColors.Sun1, style = MaterialTheme.typography.labelMedium)
         }
+    }
+    if (showVolume) {
+        VolumeDialog(
+            onDismiss = { showVolume = false },
+            onVoiceTest = { JogService.send(ctx, JogService.ACTION_VOICE_TEST) },
+        )
     }
 }
 

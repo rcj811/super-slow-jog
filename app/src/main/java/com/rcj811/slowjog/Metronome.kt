@@ -60,6 +60,14 @@ class Metronome {
         BeatClock.active = false
     }
 
+    /** 柔和限幅：音量拉到 100% 以上時讓峰值圓滑壓縮，不會破音 */
+    private fun softLimit(x: Float): Float {
+        val a = kotlin.math.abs(x)
+        if (a <= 0.7f) return x
+        val y = 0.7f + 0.3f * kotlin.math.tanh((a - 0.7f) / 0.3f)
+        return if (x < 0) -y else y
+    }
+
     private fun loop() {
         Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
         val sr = BeatSynth.SAMPLE_RATE
@@ -126,7 +134,7 @@ class Metronome {
                             s += v.data[v.pos++]
                         }
                     }
-                    val out = (s * vol * 0.85f).coerceIn(-1f, 1f)
+                    val out = softLimit(s * vol * 0.85f)
                     chunk[i] = (out * 32767).toInt().toShort()
                 }
                 if (isPaused) BeatClock.active = false

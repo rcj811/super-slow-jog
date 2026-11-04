@@ -19,7 +19,10 @@ data class Settings(
     val durationMin: Int = 30,
     val cadence: Int = 180,
     val weightKg: Int = 60,
+    /** 節拍音量 0–1.5（超過 100% 以柔和限幅放大） */
     val volume: Float = 0.8f,
+    /** 語音提醒音量 0–1 */
+    val voiceVolume: Float = 1.0f,
     val beatSound: BeatSound = BeatSound.WATER,
     val alternateTone: Boolean = true,
     val voiceOn: Boolean = true,
@@ -40,6 +43,7 @@ data class Settings(
         const val MAX_CADENCE = 250
         const val REMINDER_EVERY_MIN = 5
         const val COUNTDOWN_SEC = 3
+        const val MAX_BEAT_VOLUME = 1.5f
 
         fun clampDuration(v: Int): Int {
             val rounded = Math.round(v / DURATION_STEP.toFloat()) * DURATION_STEP
@@ -64,7 +68,8 @@ object Prefs {
             durationMin = Settings.clampDuration(p.getInt("durationMin", d.durationMin)),
             cadence = Settings.clampCadence(p.getInt("cadence", d.cadence)),
             weightKg = p.getInt("weightKg", d.weightKg).coerceIn(30, 200),
-            volume = p.getFloat("volume", d.volume).coerceIn(0f, 1f),
+            volume = p.getFloat("volume", d.volume).coerceIn(0f, Settings.MAX_BEAT_VOLUME),
+            voiceVolume = p.getFloat("voiceVolume", d.voiceVolume).coerceIn(0f, 1f),
             beatSound = BeatSound.fromId(p.getString("beatSound", d.beatSound.name)),
             alternateTone = p.getBoolean("alternateTone", d.alternateTone),
             voiceOn = p.getBoolean("voiceOn", d.voiceOn),
@@ -89,7 +94,8 @@ object Prefs {
                 durationMin = Settings.clampDuration(it.durationMin),
                 cadence = Settings.clampCadence(it.cadence),
                 weightKg = it.weightKg.coerceIn(30, 200),
-                volume = it.volume.coerceIn(0f, 1f),
+                volume = it.volume.coerceIn(0f, Settings.MAX_BEAT_VOLUME),
+                voiceVolume = it.voiceVolume.coerceIn(0f, 1f),
             )
         }
         _settings.value = s
@@ -98,6 +104,7 @@ object Prefs {
             .putInt("cadence", s.cadence)
             .putInt("weightKg", s.weightKg)
             .putFloat("volume", s.volume)
+            .putFloat("voiceVolume", s.voiceVolume)
             .putString("beatSound", s.beatSound.name)
             .putBoolean("alternateTone", s.alternateTone)
             .putBoolean("voiceOn", s.voiceOn)

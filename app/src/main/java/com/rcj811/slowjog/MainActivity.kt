@@ -3,6 +3,7 @@ package com.rcj811.slowjog
 import android.Manifest
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -35,6 +36,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Prefs.load(this)
         SessionStore.load(this)
+        volumeControlStream = AudioManager.STREAM_MUSIC // 音量鍵直接調媒體音量（節拍與語音）
         applyOrientation(Prefs.settings.value.screenMode)
         lifecycleScope.launch {
             Prefs.settings.map { it.screenMode }.distinctUntilChanged().collect { applyOrientation(it) }

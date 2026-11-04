@@ -82,6 +82,16 @@ fun SettingsScreen() {
         Spacer(Modifier.height(8.dp))
         ScreenTitle("設定")
 
+        // ---- 音量 ----
+        JogCard {
+            SectionLabel("音量")
+            Spacer(Modifier.height(10.dp))
+            VolumeControls(
+                onBeatTest = { PreviewPlayer.play(Prefs.settings.value, millis = 1500) },
+                onVoiceTest = { sayDemo() },
+            )
+        }
+
         // ---- 節拍聲音 ----
         JogCard {
             SectionLabel("節拍聲音（點一下試聽）")
@@ -101,13 +111,6 @@ fun SettingsScreen() {
                 }
             }
             SwitchRow("左右腳不同音高", "幫助分辨左右腳節奏", s.alternateTone) { v -> Prefs.update(ctx) { it.copy(alternateTone = v) } }
-            Spacer(Modifier.height(4.dp))
-            Text("音量 ${(s.volume * 100).toInt()}%", color = JogColors.Text, style = MaterialTheme.typography.bodyLarge)
-            Slider(
-                value = s.volume, onValueChange = { v -> Prefs.update(ctx) { it.copy(volume = v) }; PreviewPlayer.update(Prefs.settings.value) },
-                onValueChangeFinished = { PreviewPlayer.play(Prefs.settings.value, millis = 1200) },
-                colors = sliderColors(),
-            )
         }
 
         // ---- 語音提醒 ----

@@ -62,6 +62,9 @@ class JogService : Service() {
             ACTION_RESUME -> resume()
             ACTION_STOP -> stopRun()
             ACTION_CADENCE -> setCadence(intent.getIntExtra(EXTRA_CADENCE, RunRepository.state.value.cadence))
+            ACTION_VOICE_TEST -> if (RunRepository.state.value.isActive) {
+                if (Prefs.settings.value.voiceOn) announcer?.speak("語音音量測試", flush = true) else announcer?.chime()
+            }
             else -> if (!RunRepository.state.value.isActive) stopSelf()
         }
         return START_NOT_STICKY
@@ -398,6 +401,7 @@ class JogService : Service() {
         const val ACTION_RESUME = "slowjog.RESUME"
         const val ACTION_STOP = "slowjog.STOP"
         const val ACTION_CADENCE = "slowjog.CADENCE"
+        const val ACTION_VOICE_TEST = "slowjog.VOICE_TEST"
         const val EXTRA_CADENCE = "cadence"
         private const val CHANNEL = "jog"
         private const val NOTIF_ID = 42

@@ -5,6 +5,7 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Build
+import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -66,6 +67,7 @@ class Announcer(context: Context, private val onReady: (() -> Unit)? = null) : T
     @Volatile var chineseAvailable = false; private set
     private val pending = ArrayList<String>()
     private var tone: ToneGenerator? = null
+    private var toneVolume = -1
 
     override fun onInit(status: Int) {
         val t = tts ?: return
@@ -125,7 +127,10 @@ class Announcer(context: Context, private val onReady: (() -> Unit)? = null) : T
     private fun speakNow(text: String, flush: Boolean) {
         val t = tts
         if (t != null && chineseAvailable) {
-            t.speak(text, if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, "jog-${System.nanoTime()}")
+            val params = Bundle().apply {
+                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, Prefs.settings.value.voiceVolume.coerceIn(0f, 1f))
+            }
+            t.speak(text, if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, params, "jog-${System.nanoTime()}")
         } else {
             chime()
         }
@@ -133,7 +138,13 @@ class Announcer(context: Context, private val onReady: (() -> Unit)? = null) : T
 
     fun chime(long: Boolean = false) {
         runCatching {
-            val tg = tone ?: ToneGenerator(AudioManager.STREAM_NOTIFICATION, 85).also { tone = it }
+            val vol = (Prefs.settings.value.voiceVolume * 100).toInt().coerceIn(0, 100)
+            if (tone == null || toneVolume != vol) {
+                tone?.release()
+                tone = ToneGenerator(AudioManager.STREAM_MUSIC, vol)
+                toneVolume = vol
+            }
+            val tg = tone ?: return@runCatching
             tg.startTone(if (long) ToneGenerator.TONE_PROP_PROMPT else ToneGenerator.TONE_PROP_BEEP2, if (long) 600 else 300)
         }
     }
