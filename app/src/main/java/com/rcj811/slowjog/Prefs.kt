@@ -14,7 +14,7 @@ enum class ScreenMode(val label: String) {
     fun next(): ScreenMode = entries[(ordinal + 1) % entries.size]
 }
 
-/** 使用者設定：時間（10 分鐘為單位）、步頻 150–250、體重、聲音等。 */
+/** 使用者設定：時間（10 分鐘為單位）、步頻 160–220（每格 5）、體重、聲音等。 */
 data class Settings(
     val durationMin: Int = 30,
     val cadence: Int = 180,
@@ -34,13 +34,15 @@ data class Settings(
     val countdownOn: Boolean = true,
     val keepScreenOn: Boolean = true,
     val screenMode: ScreenMode = ScreenMode.PORTRAIT,
+    val mascot: Mascot = Mascot.DUCK,
 ) {
     companion object {
         const val MIN_DURATION = 10
         const val MAX_DURATION = 180
         const val DURATION_STEP = 10
-        const val MIN_CADENCE = 150
-        const val MAX_CADENCE = 250
+        const val MIN_CADENCE = 160
+        const val MAX_CADENCE = 220
+        const val CADENCE_STEP = 5
         const val REMINDER_EVERY_MIN = 5
         const val COUNTDOWN_SEC = 3
         const val MAX_BEAT_VOLUME = 1.5f
@@ -50,7 +52,11 @@ data class Settings(
             return rounded.coerceIn(MIN_DURATION, MAX_DURATION)
         }
 
-        fun clampCadence(v: Int): Int = v.coerceIn(MIN_CADENCE, MAX_CADENCE)
+        /** 步頻以 5 為一格，160–220 */
+        fun clampCadence(v: Int): Int {
+            val rounded = Math.round(v / CADENCE_STEP.toFloat()) * CADENCE_STEP
+            return rounded.coerceIn(MIN_CADENCE, MAX_CADENCE)
+        }
     }
 }
 
@@ -84,6 +90,7 @@ object Prefs {
             screenMode = runCatching {
                 ScreenMode.valueOf(p.getString("screenMode", d.screenMode.name)!!)
             }.getOrDefault(d.screenMode),
+            mascot = Mascot.fromId(p.getString("mascot", d.mascot.name)),
         )
         loaded = true
     }
@@ -115,6 +122,13 @@ object Prefs {
             .putBoolean("countdownOn", s.countdownOn)
             .putBoolean("keepScreenOn", s.keepScreenOn)
             .putString("screenMode", s.screenMode.name)
+            .putString("mascot", s.mascot.name)
             .apply()
+    }
+
+    /** 所有設定回到初始值 */
+    fun reset(context: Context) {
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().clear().apply()
+        _settings.value = Settings()
     }
 }

@@ -176,7 +176,7 @@ private fun ActiveRun(run: RunState, s: Settings) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RingArea(
-                    run, phase, pulse, moving, blink,
+                    run, s, phase, pulse, moving, blink,
                     Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true),
                 )
                 Spacer(Modifier.width(20.dp))
@@ -213,7 +213,7 @@ private fun ActiveRun(run: RunState, s: Settings) {
                 Box(Modifier.fillMaxWidth().height(52.dp), contentAlignment = Alignment.Center) {
                     MilestoneBanner(showBanner, bannerText)
                 }
-                RingArea(run, phase, pulse, moving, blink, Modifier.fillMaxWidth(0.86f).aspectRatio(1f))
+                RingArea(run, s, phase, pulse, moving, blink, Modifier.fillMaxWidth(0.86f).aspectRatio(1f))
                 Spacer(Modifier.height(10.dp))
                 FootRow(phase, pulse, moving)
                 Spacer(Modifier.height(12.dp))
@@ -279,9 +279,9 @@ private fun RunHeader(run: RunState, s: Settings) {
     }
 }
 
-/** 進度圓環 + 跑者動畫 + 剩餘時間（大小隨可用空間縮放） */
+/** 進度圓環 + 原地跑角色 + 剩餘時間（大小隨可用空間縮放） */
 @Composable
-private fun RingArea(run: RunState, phase: Double, pulse: Float, moving: Boolean, blink: Float, modifier: Modifier) {
+private fun RingArea(run: RunState, s: Settings, phase: Double, pulse: Float, moving: Boolean, blink: Float, modifier: Modifier) {
     BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
         val w = maxWidth
         val small = w < 280.dp
@@ -289,10 +289,12 @@ private fun RingArea(run: RunState, phase: Double, pulse: Float, moving: Boolean
         when (run.phase) {
             Phase.COUNTDOWN -> CountdownCenter(run.countdown, small)
             else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Runner(
-                    beatPhase = phase,
+                MascotView(
+                    s.mascot,
+                    Modifier.size(w * 0.5f),
                     moving = moving,
-                    modifier = Modifier.size(w * 0.46f).scale(1f + 0.015f * pulse),
+                    cadence = run.cadence,
+                    phaseSource = { if (BeatClock.active) phase else null },
                 )
                 Text(
                     Format.clock(run.remainingMs / 1000),
@@ -336,13 +338,13 @@ private fun StatsCard(run: RunState) {
 private fun CadenceControl(run: RunState) {
     val ctx = LocalContext.current
     Row(verticalAlignment = Alignment.CenterVertically) {
-        RepeatButton("−", { JogService.send(ctx, JogService.ACTION_CADENCE, run.cadence - 1) }, size = 44.dp,
+        RepeatButton("−", { JogService.send(ctx, JogService.ACTION_CADENCE, run.cadence - Settings.CADENCE_STEP) }, size = 44.dp,
             enabled = run.cadence > Settings.MIN_CADENCE)
         Column(Modifier.width(100.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("${run.cadence}", style = MaterialTheme.typography.headlineSmall, color = JogColors.Text)
             Text("步/分", style = MaterialTheme.typography.labelMedium, color = JogColors.Muted)
         }
-        RepeatButton("+", { JogService.send(ctx, JogService.ACTION_CADENCE, run.cadence + 1) }, size = 44.dp,
+        RepeatButton("+", { JogService.send(ctx, JogService.ACTION_CADENCE, run.cadence + Settings.CADENCE_STEP) }, size = 44.dp,
             enabled = run.cadence < Settings.MAX_CADENCE)
     }
 }
@@ -505,25 +507,36 @@ private fun ResultView(result: Session?) {
                 }
             }
         }
+        val mascot = Prefs.settings.collectAsStateWithLifecycle().value.mascot
         val badgeView: @Composable (Dp) -> Unit = { size ->
-            Box(
-                Modifier
-                    .size(size)
-                    .scale(badge.value)
-                    .clip(CircleShape)
-                    .background(JogColors.sunrise),
-                contentAlignment = Alignment.Center,
-            ) {
-                Canvas(Modifier.size(size * 0.48f)) {
-                    val path = Path().apply {
-                        moveTo(this@Canvas.size.width * 0.12f, this@Canvas.size.height * 0.52f)
-                        lineTo(this@Canvas.size.width * 0.42f, this@Canvas.size.height * 0.8f)
-                        lineTo(this@Canvas.size.width * 0.9f, this@Canvas.size.height * 0.22f)
+            Box(Modifier.size(size * 1.25f).scale(badge.value), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier
+                        .size(size)
+                        .clip(CircleShape)
+                        .background(JogColors.sunrise)
+                )
+                MascotView(mascot, Modifier.size(size * 1.15f), celebrate = true)
+                // 打勾小徽章
+                Box(
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(size * 0.34f)
+                        .clip(CircleShape)
+                        .background(JogColors.Mint),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Canvas(Modifier.size(size * 0.2f)) {
+                        val path = Path().apply {
+                            moveTo(this@Canvas.size.width * 0.12f, this@Canvas.size.height * 0.52f)
+                            lineTo(this@Canvas.size.width * 0.42f, this@Canvas.size.height * 0.8f)
+                            lineTo(this@Canvas.size.width * 0.9f, this@Canvas.size.height * 0.22f)
+                        }
+                        val pm = PathMeasure().apply { setPath(path, false) }
+                        val seg = Path()
+                        pm.getSegment(0f, pm.length * check.value, seg, true)
+                        drawPath(seg, Color(0xFF0E2A1E), style = Stroke(this@Canvas.size.width * 0.16f, cap = StrokeCap.Round, join = StrokeJoin.Round))
                     }
-                    val pm = PathMeasure().apply { setPath(path, false) }
-                    val seg = Path()
-                    pm.getSegment(0f, pm.length * check.value, seg, true)
-                    drawPath(seg, Color(0xFF1A0E08), style = Stroke(this@Canvas.size.width * 0.12f, cap = StrokeCap.Round, join = StrokeJoin.Round))
                 }
             }
         }
@@ -565,7 +578,7 @@ private fun ResultView(result: Session?) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    badgeView(108.dp)
+                    badgeView(100.dp)
                     Spacer(Modifier.height(16.dp))
                     titleView()
                 }
@@ -586,7 +599,7 @@ private fun ResultView(result: Session?) {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Spacer(Modifier.weight(0.6f))
-                badgeView(132.dp)
+                badgeView(128.dp)
                 Spacer(Modifier.height(22.dp))
                 titleView()
                 Spacer(Modifier.height(24.dp))

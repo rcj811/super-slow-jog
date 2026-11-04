@@ -28,17 +28,25 @@ class CoreTest {
         assertEquals(40, Settings.clampDuration(40))
     }
 
-    @Test fun cadenceClamped() {
-        assertEquals(150, Settings.clampCadence(120))
-        assertEquals(250, Settings.clampCadence(300))
-        assertEquals(203, Settings.clampCadence(203))
+    @Test fun cadenceClampedToStepsOfFive() {
+        assertEquals(160, Settings.clampCadence(120))
+        assertEquals(220, Settings.clampCadence(300))
+        assertEquals(220, Settings.clampCadence(221))
+        assertEquals(185, Settings.clampCadence(183))
+        assertEquals(180, Settings.clampCadence(182))
+        assertEquals(175, Settings.clampCadence(175))
+        // 每格 5，共 13 段
+        val all = (Settings.MIN_CADENCE..Settings.MAX_CADENCE step Settings.CADENCE_STEP).toList()
+        assertEquals(13, all.size)
+        assertEquals(160, all.first())
+        assertEquals(220, all.last())
     }
 
     @Test fun caloriesReasonable() {
         // 60kg、180 步/分、30 分鐘 ≈ 4.4 METs × 60 × 0.5 = 132 kcal
         val k = Calories.kcal(180, 60, 30 * 60_000L)
         assertEquals(132.0, k, 0.5)
-        assertTrue(Calories.mets(250) > Calories.mets(150))
+        assertTrue(Calories.mets(220) > Calories.mets(160))
     }
 
     @Test fun dailyMonthlyYearlyTotals() {
@@ -71,6 +79,28 @@ class CoreTest {
         val week = Stats.weekOf(all, d, zone) // 2026-11-04 是週三
         assertEquals(LocalDate.of(2026, 11, 2), week.first().first)
         assertEquals(40, week[2].second.minutes)
+    }
+
+    @Test fun jogInPlaceAlternatesFeet() {
+        val a = com.rcj811.slowjog.ui.jogPose(0.5, true, 0f, false)
+        assertEquals(1f, a.liftR, 0.01f)
+        assertEquals(0f, a.liftL, 0.01f)
+        val b = com.rcj811.slowjog.ui.jogPose(1.5, true, 0f, false)
+        assertEquals(1f, b.liftL, 0.01f)
+        assertEquals(0f, b.liftR, 0.01f)
+        // 落地瞬間身體最低、壓縮最大
+        val land = com.rcj811.slowjog.ui.jogPose(2.0, true, 0f, false)
+        assertEquals(0f, land.bounce, 0.01f)
+        assertEquals(1f, land.squash, 0.01f)
+        // 暫停時雙腳著地
+        val idle = com.rcj811.slowjog.ui.jogPose(0.5, false, 1f, false)
+        assertEquals(0f, idle.liftL + idle.liftR, 0.001f)
+    }
+
+    @Test fun mascotIds() {
+        assertEquals(Mascot.CAPYBARA, Mascot.fromId("CAPYBARA"))
+        assertEquals(Mascot.DUCK, Mascot.fromId("unknown"))
+        assertEquals(Mascot.DUCK, Mascot.fromId(null))
     }
 
     @Test fun voiceGenderGuess() {

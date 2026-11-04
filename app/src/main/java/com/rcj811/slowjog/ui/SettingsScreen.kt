@@ -1,6 +1,7 @@
 package com.rcj811.slowjog.ui
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,7 +22,9 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -40,6 +43,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rcj811.slowjog.Announcer
+import com.rcj811.slowjog.AvatarStore
+import com.rcj811.slowjog.SessionStore
 import com.rcj811.slowjog.BeatSound
 import com.rcj811.slowjog.Calories
 import com.rcj811.slowjog.Prefs
@@ -81,6 +86,13 @@ fun SettingsScreen() {
     ) {
         Spacer(Modifier.height(8.dp))
         ScreenTitle("設定")
+
+        // ---- 陪跑角色 ----
+        JogCard {
+            SectionLabel("陪跑角色（原地超慢跑動畫）")
+            Spacer(Modifier.height(10.dp))
+            MascotPicker()
+        }
 
         // ---- 音量 ----
         JogCard {
@@ -232,10 +244,72 @@ fun SettingsScreen() {
             SwitchRow("跑步時螢幕保持開啟", "關閉後鎖螢幕也會繼續計時與播放節拍", s.keepScreenOn) { v -> Prefs.update(ctx) { it.copy(keepScreenOn = v) } }
         }
 
+        // ---- 清除資料 ----
+        ResetCard()
+
         Text(
             "節拍聲皆由 App 即時合成，可與音樂同時播放。",
             color = JogColors.Faint, style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+        )
+    }
+}
+
+private enum class ResetKind(val title: String, val body: String, val button: String) {
+    SETTINGS("設定回到初始值", "時間、步頻、音量、聲音、角色、畫面方向等設定會恢復成剛安裝時的樣子。跑步紀錄會保留。", "恢復初始設定"),
+    RECORDS("清除跑步紀錄", "所有日 / 月 / 年統計與跑步紀錄都會刪除，無法復原。設定會保留。", "清除紀錄"),
+    ALL("全部清除", "跑步紀錄、所有設定和「我的照片」都會刪除，App 回到剛安裝的狀態，無法復原。", "全部清除"),
+}
+
+@Composable
+private fun ResetCard() {
+    val ctx = LocalContext.current
+    var confirm by remember { mutableStateOf<ResetKind?>(null) }
+    JogCard {
+        SectionLabel("清除資料")
+        Spacer(Modifier.height(6.dp))
+        ResetKind.entries.forEach { k ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable { confirm = k }
+                    .padding(vertical = 12.dp, horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    k.title,
+                    color = if (k == ResetKind.SETTINGS) JogColors.Text else JogColors.Sun3,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                Text("›", color = JogColors.Faint, style = MaterialTheme.typography.titleMedium)
+            }
+        }
+    }
+    confirm?.let { k ->
+        AlertDialog(
+            onDismissRequest = { confirm = null },
+            containerColor = JogColors.SurfaceHigh,
+            title = { Text(k.title + "？") },
+            text = { Text(k.body) },
+            confirmButton = {
+                TextButton(onClick = {
+                    PreviewPlayer.stop()
+                    when (k) {
+                        ResetKind.SETTINGS -> Prefs.reset(ctx)
+                        ResetKind.RECORDS -> SessionStore.clear(ctx)
+                        ResetKind.ALL -> {
+                            Prefs.reset(ctx)
+                            SessionStore.clear(ctx)
+                            AvatarStore.clear(ctx)
+                        }
+                    }
+                    confirm = null
+                    Toast.makeText(ctx, "已${k.button}", Toast.LENGTH_SHORT).show()
+                }) { Text(k.button, color = JogColors.Sun3) }
+            },
+            dismissButton = { TextButton(onClick = { confirm = null }) { Text("取消", color = JogColors.Text) } },
         )
     }
 }

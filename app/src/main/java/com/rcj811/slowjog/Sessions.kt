@@ -83,6 +83,13 @@ object SessionStore {
         save(context, list)
     }
 
+    /** 刪除全部跑步紀錄 */
+    @Synchronized
+    fun clear(context: Context) {
+        _sessions.value = emptyList()
+        runCatching { file(context).delete() }
+    }
+
     private fun save(context: Context, list: List<Session>) {
         val arr = JSONArray()
         list.forEach { arr.put(it.toJson()) }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -131,7 +132,7 @@ fun SetupScreen(onStart: () -> Unit) {
         // 步頻
         JogCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SectionLabel("步頻（每分鐘步數 150–250）", Modifier.weight(1f))
+                SectionLabel("步頻（每分鐘 160–220 步，每格 5）", Modifier.weight(1f))
                 Box(
                     Modifier
                         .clip(RoundedCornerShape(50))
@@ -148,7 +149,7 @@ fun SetupScreen(onStart: () -> Unit) {
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-                RepeatButton("−", { Prefs.update(ctx) { it.copy(cadence = it.cadence - 1) } }, enabled = s.cadence > Settings.MIN_CADENCE)
+                RepeatButton("−", { Prefs.update(ctx) { it.copy(cadence = it.cadence - Settings.CADENCE_STEP) } }, enabled = s.cadence > Settings.MIN_CADENCE)
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         BeatDot(previewing != null)
@@ -160,18 +161,19 @@ fun SetupScreen(onStart: () -> Unit) {
                     }
                     Text(cadenceHint(s.cadence), color = JogColors.Muted, style = MaterialTheme.typography.bodyMedium)
                 }
-                RepeatButton("+", { Prefs.update(ctx) { it.copy(cadence = it.cadence + 1) } }, enabled = s.cadence < Settings.MAX_CADENCE)
+                RepeatButton("+", { Prefs.update(ctx) { it.copy(cadence = it.cadence + Settings.CADENCE_STEP) } }, enabled = s.cadence < Settings.MAX_CADENCE)
             }
             Slider(
                 value = s.cadence.toFloat(),
                 onValueChange = { v -> Prefs.update(ctx) { it.copy(cadence = Math.round(v)) } },
                 valueRange = Settings.MIN_CADENCE.toFloat()..Settings.MAX_CADENCE.toFloat(),
+                steps = (Settings.MAX_CADENCE - Settings.MIN_CADENCE) / Settings.CADENCE_STEP - 1,
                 colors = SliderDefaults.colors(
                     thumbColor = JogColors.Sun1, activeTrackColor = JogColors.Sun2, inactiveTrackColor = JogColors.SurfaceHigh,
                 ),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(160 to "入門", 180 to "標準", 200 to "進階").forEach { (c, name) ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                listOf(160 to "入門", 170 to "輕鬆", 180 to "標準", 200 to "進階", 220 to "挑戰").forEach { (c, name) ->
                     Chip("$name $c", s.cadence == c, { Prefs.update(ctx) { it.copy(cadence = c) } })
                 }
             }
@@ -220,6 +222,7 @@ fun SetupScreen(onStart: () -> Unit) {
             ) {
                 Spacer(Modifier.height(8.dp))
                 header()
+                MascotHero(s.cadence, previewing != null)
                 todayCard()
                 durationCard()
                 Spacer(Modifier.height(16.dp))
@@ -245,6 +248,7 @@ fun SetupScreen(onStart: () -> Unit) {
         ) {
             Spacer(Modifier.height(8.dp))
             header()
+            MascotHero(s.cadence, previewing != null)
             todayCard()
             durationCard()
             cadenceCard()
@@ -255,11 +259,12 @@ fun SetupScreen(onStart: () -> Unit) {
 }
 
 private fun cadenceHint(c: Int) = when {
-    c < 165 -> "輕鬆入門・適合暖身"
-    c < 185 -> "標準超慢跑節奏"
-    c < 205 -> "稍快・心肺加強"
-    c < 225 -> "快節奏・小步快跑"
-    else -> "極快節奏"
+    c <= 165 -> "輕鬆入門・適合暖身"
+    c <= 175 -> "輕鬆節奏"
+    c <= 185 -> "標準超慢跑節奏"
+    c <= 195 -> "稍快・心肺加強"
+    c <= 205 -> "進階・小步快跑"
+    else -> "挑戰・快節奏"
 }
 
 /** 隨節拍跳動的小點（試聽時） */

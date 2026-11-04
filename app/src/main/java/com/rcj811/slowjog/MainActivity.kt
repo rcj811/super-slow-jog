@@ -36,6 +36,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Prefs.load(this)
         SessionStore.load(this)
+        AvatarStore.load(this)
         volumeControlStream = AudioManager.STREAM_MUSIC // 音量鍵直接調媒體音量（節拍與語音）
         applyOrientation(Prefs.settings.value.screenMode)
         lifecycleScope.launch {
