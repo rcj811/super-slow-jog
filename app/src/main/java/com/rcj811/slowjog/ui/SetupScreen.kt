@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -73,15 +74,7 @@ fun SetupScreen(onStart: () -> Unit) {
     val breathe = rememberInfiniteTransition(label = "breathe")
     val scale by breathe.animateFloat(1f, 1.03f, infiniteRepeatable(tween(1400), RepeatMode.Reverse), label = "scale")
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .statusBarsPadding()
-            .padding(horizontal = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Spacer(Modifier.height(8.dp))
+    val header: @Composable () -> Unit = {
         val dateText = today.format(DateTimeFormatter.ofPattern("M 月 d 日")) + " " +
             today.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.TAIWAN)
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -97,7 +90,8 @@ fun SetupScreen(onStart: () -> Unit) {
                 }
             }
         }
-
+    }
+    val todayCard: @Composable () -> Unit = {
         // 今日小結
         JogCard {
             SectionLabel("今天")
@@ -108,7 +102,8 @@ fun SetupScreen(onStart: () -> Unit) {
                 StatTile(Format.kcal(todayTotals.kcal), "大卡", Modifier.weight(1f), JogColors.Flame)
             }
         }
-
+    }
+    val durationCard: @Composable () -> Unit = {
         // 時間
         JogCard {
             SectionLabel("跑步時間（每格 10 分鐘）")
@@ -131,7 +126,8 @@ fun SetupScreen(onStart: () -> Unit) {
                 }
             }
         }
-
+    }
+    val cadenceCard: @Composable () -> Unit = {
         // 步頻
         JogCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -180,7 +176,8 @@ fun SetupScreen(onStart: () -> Unit) {
                 }
             }
         }
-
+    }
+    val startArea: @Composable () -> Unit = {
         // 預估
         val estSteps = s.durationMin.toLong() * s.cadence
         val estKcal = Calories.kcal(s.cadence, s.weightKg, s.durationMin * 60_000L)
@@ -207,7 +204,53 @@ fun SetupScreen(onStart: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             breathing = scale,
         )
-        Spacer(Modifier.height(24.dp))
+    }
+
+    if (isLandscape()) {
+        Row(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .padding(horizontal = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Column(
+                Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Spacer(Modifier.height(8.dp))
+                header()
+                todayCard()
+                durationCard()
+                Spacer(Modifier.height(16.dp))
+            }
+            Column(
+                Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Spacer(Modifier.height(8.dp))
+                cadenceCard()
+                startArea()
+                Spacer(Modifier.height(16.dp))
+            }
+        }
+    } else {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .statusBarsPadding()
+                .padding(horizontal = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Spacer(Modifier.height(8.dp))
+            header()
+            todayCard()
+            durationCard()
+            cadenceCard()
+            startArea()
+            Spacer(Modifier.height(24.dp))
+        }
     }
 }
 

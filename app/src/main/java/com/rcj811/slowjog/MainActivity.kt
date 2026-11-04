@@ -1,6 +1,7 @@
 package com.rcj811.slowjog
 
 import android.Manifest
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -10,6 +11,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import com.rcj811.slowjog.ui.AppRoot
 import com.rcj811.slowjog.ui.JogTheme
 
@@ -30,11 +35,24 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Prefs.load(this)
         SessionStore.load(this)
+        applyOrientation(Prefs.settings.value.screenMode)
+        lifecycleScope.launch {
+            Prefs.settings.map { it.screenMode }.distinctUntilChanged().collect { applyOrientation(it) }
+        }
         setContent {
             JogTheme {
                 AppRoot(onStart = ::startRun)
             }
         }
+    }
+
+    private fun applyOrientation(mode: ScreenMode) {
+        val want = when (mode) {
+            ScreenMode.PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+            ScreenMode.LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            ScreenMode.AUTO -> ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
+        }
+        if (requestedOrientation != want) requestedOrientation = want
     }
 
     private fun startRun() {

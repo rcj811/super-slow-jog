@@ -27,10 +27,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.displayCutoutPadding
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -38,6 +41,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -73,6 +77,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -122,6 +127,7 @@ private fun ActiveRun(run: RunState, s: Settings) {
     }
     val pulse = if (moving) beatPulse(phase) else 0f
     var confirmStop by remember { mutableStateOf(false) }
+    val landscape = isLandscape()
 
     // 5 分鐘里程碑提示
     var bannerFor by remember { mutableIntStateOf(0) }
@@ -134,9 +140,13 @@ private fun ActiveRun(run: RunState, s: Settings) {
             showBanner = false
         }
     }
+    val done = bannerFor * Settings.REMINDER_EVERY_MIN
+    val bannerText = "🎉 已完成 $done 分鐘・還剩 ${run.targetMin - done} 分鐘"
 
     val pausedBlink = rememberInfiniteTransition(label = "paused")
     val blink by pausedBlink.animateFloat(0.45f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "blink")
+
+    val onStop: () -> Unit = { if (run.phase == Phase.COUNTDOWN) JogService.send(ctx, JogService.ACTION_STOP) else confirmStop = true }
 
     Box(
         Modifier
@@ -144,139 +154,76 @@ private fun ActiveRun(run: RunState, s: Settings) {
             .background(JogColors.Bg)
             .drawBehind {
                 // 隨節拍呼吸的背景光暈
-                val c = Offset(size.width / 2, size.height * 0.36f)
+                val c = if (landscape) Offset(size.height * 0.5f + 16.dp.toPx(), size.height / 2)
+                else Offset(size.width / 2, size.height * 0.36f)
+                val base = if (landscape) size.height else size.width
                 drawCircle(
                     Brush.radialGradient(
                         listOf(JogColors.Sun2.copy(alpha = 0.10f + 0.10f * pulse), Color.Transparent),
-                        center = c, radius = size.width * (0.75f + 0.04f * pulse),
+                        center = c, radius = base * (0.75f + 0.04f * pulse),
                     ),
-                    radius = size.width, center = c,
+                    radius = base, center = c,
                 )
             }
     ) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Spacer(Modifier.height(10.dp))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("超慢跑", style = MaterialTheme.typography.titleMedium, color = JogColors.Text)
-                    Text("目標 ${Format.minutes(run.targetMin)}", style = MaterialTheme.typography.bodyMedium, color = JogColors.Muted)
-                }
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(JogColors.SurfaceHigh)
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text("♪ ${s.beatSound.label}", color = JogColors.Muted, style = MaterialTheme.typography.labelMedium)
-                }
-            }
-
-            // 里程碑橫幅
-            Box(Modifier.fillMaxWidth().height(52.dp), contentAlignment = Alignment.Center) {
-                val done = bannerFor * Settings.REMINDER_EVERY_MIN
-                MilestoneBanner(showBanner, "🎉 已完成 $done 分鐘・還剩 ${run.targetMin - done} 分鐘")
-            }
-
-            // 主圓環
-            Box(
+        if (landscape) {
+            Row(
                 Modifier
-                    .fillMaxWidth(0.86f)
-                    .aspectRatio(1f),
-                contentAlignment = Alignment.Center,
+                    .fillMaxSize()
+                    .systemBarsPadding()
+                    .displayCutoutPadding()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                ProgressRing(run, pulse, Modifier.fillMaxSize())
-                when (run.phase) {
-                    Phase.COUNTDOWN -> CountdownCenter(run.countdown)
-                    else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Runner(
-                            beatPhase = phase,
-                            moving = moving,
-                            modifier = Modifier.size(150.dp).scale(1f + 0.015f * pulse),
-                        )
-                        Text(
-                            Format.clock(run.remainingMs / 1000),
-                            style = MaterialTheme.typography.displayMedium,
-                            color = JogColors.Text,
-                        )
-                        Text(
-                            if (run.phase == Phase.PAUSED) "已暫停" else "剩餘時間",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (run.phase == Phase.PAUSED) JogColors.Sun1.copy(alpha = blink) else JogColors.Muted,
-                        )
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(10.dp))
-            // 左右腳
-            val idx = floor(phase).toLong()
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text("左", color = JogColors.Faint, style = MaterialTheme.typography.labelMedium)
-                FootprintDot(if (moving && idx % 2 == 0L) pulse else 0f, JogColors.Sun1, Modifier.size(width = 22.dp, height = 30.dp))
-                FootprintDot(if (moving && idx % 2 != 0L) pulse else 0f, JogColors.Sun3, Modifier.size(width = 22.dp, height = 30.dp).padding(top = 4.dp))
-                Text("右", color = JogColors.Faint, style = MaterialTheme.typography.labelMedium)
-            }
-
-            Spacer(Modifier.height(12.dp))
-            JogCard(Modifier.fillMaxWidth(), padding = 14.dp) {
-                Row(Modifier.fillMaxWidth()) {
-                    StatTile(Format.clock(run.elapsedMs / 1000), "已跑", Modifier.weight(1f), JogColors.Sky)
-                    StatTile(Format.thousands(run.steps), "步數", Modifier.weight(1f), JogColors.Mint)
-                    StatTile(Format.kcal(run.kcal), "大卡", Modifier.weight(1f), JogColors.Flame)
-                }
-            }
-
-            Spacer(Modifier.height(10.dp))
-            // 跑步中調整步頻
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RepeatButton("−", { JogService.send(ctx, JogService.ACTION_CADENCE, run.cadence - 1) }, size = 44.dp,
-                    enabled = run.cadence > Settings.MIN_CADENCE)
-                Column(Modifier.width(130.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("${run.cadence}", style = MaterialTheme.typography.headlineSmall, color = JogColors.Text)
-                    Text("步/分", style = MaterialTheme.typography.labelMedium, color = JogColors.Muted)
-                }
-                RepeatButton("+", { JogService.send(ctx, JogService.ACTION_CADENCE, run.cadence + 1) }, size = 44.dp,
-                    enabled = run.cadence < Settings.MAX_CADENCE)
-            }
-
-            Spacer(Modifier.weight(1f))
-            // 控制鈕
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-                Box(
-                    Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(JogColors.SurfaceHigh)
-                        .border(1.dp, JogColors.Line, CircleShape)
-                        .clickable { if (run.phase == Phase.COUNTDOWN) JogService.send(ctx, JogService.ACTION_STOP) else confirmStop = true },
-                    contentAlignment = Alignment.Center,
-                ) { GlyphIcon(Glyph.STOP, JogColors.Text, Modifier.size(26.dp)) }
-
-                val playScale by animateFloatAsState(if (moving) 1f + 0.04f * pulse else 1f, label = "play")
-                Box(
-                    Modifier
-                        .size(88.dp)
-                        .scale(playScale)
-                        .clip(CircleShape)
-                        .background(JogColors.sunrise)
-                        .clickable(enabled = run.phase != Phase.COUNTDOWN) {
-                            if (run.phase == Phase.RUNNING) JogService.send(ctx, JogService.ACTION_PAUSE)
-                            else JogService.send(ctx, JogService.ACTION_RESUME)
-                        },
-                    contentAlignment = Alignment.Center,
+                RingArea(
+                    run, phase, pulse, moving, blink,
+                    Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true),
+                )
+                Spacer(Modifier.width(20.dp))
+                Column(
+                    Modifier.weight(1f).fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceEvenly,
                 ) {
-                    GlyphIcon(if (run.phase == Phase.PAUSED) Glyph.PLAY else Glyph.PAUSE, Color(0xFF1A0E08), Modifier.size(36.dp))
+                    RunHeader(run, s)
+                    StatsCard(run)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        FootRow(phase, pulse, moving)
+                        Spacer(Modifier.width(24.dp))
+                        CadenceControl(run)
+                    }
+                    Controls(run, pulse, compact = true, onStop = onStop)
                 }
-                Spacer(Modifier.size(64.dp)) // 視覺平衡
             }
-            Spacer(Modifier.height(18.dp))
+            Box(
+                Modifier.fillMaxWidth().statusBarsPadding().padding(top = 6.dp),
+                contentAlignment = Alignment.TopCenter,
+            ) { MilestoneBanner(showBanner, bannerText) }
+        } else {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Spacer(Modifier.height(10.dp))
+                RunHeader(run, s)
+                Box(Modifier.fillMaxWidth().height(52.dp), contentAlignment = Alignment.Center) {
+                    MilestoneBanner(showBanner, bannerText)
+                }
+                RingArea(run, phase, pulse, moving, blink, Modifier.fillMaxWidth(0.86f).aspectRatio(1f))
+                Spacer(Modifier.height(10.dp))
+                FootRow(phase, pulse, moving)
+                Spacer(Modifier.height(12.dp))
+                StatsCard(run)
+                Spacer(Modifier.height(10.dp))
+                CadenceControl(run)
+                Spacer(Modifier.weight(1f))
+                Controls(run, pulse, compact = false, onStop = onStop)
+                Spacer(Modifier.height(18.dp))
+            }
         }
     }
 
@@ -293,6 +240,130 @@ private fun ActiveRun(run: RunState, s: Settings) {
             },
             dismissButton = { TextButton(onClick = { confirmStop = false }) { Text("繼續跑", color = JogColors.Text) } },
         )
+    }
+}
+
+@Composable
+private fun RunHeader(run: RunState, s: Settings) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("超慢跑", style = MaterialTheme.typography.titleMedium, color = JogColors.Text)
+            Text("目標 ${Format.minutes(run.targetMin)}", style = MaterialTheme.typography.bodyMedium, color = JogColors.Muted)
+        }
+        ScreenModeChip()
+        Spacer(Modifier.width(8.dp))
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(JogColors.SurfaceHigh)
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Text("♪ ${s.beatSound.label}", color = JogColors.Muted, style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
+/** 進度圓環 + 跑者動畫 + 剩餘時間（大小隨可用空間縮放） */
+@Composable
+private fun RingArea(run: RunState, phase: Double, pulse: Float, moving: Boolean, blink: Float, modifier: Modifier) {
+    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+        val w = maxWidth
+        val small = w < 280.dp
+        ProgressRing(run, pulse, Modifier.fillMaxSize())
+        when (run.phase) {
+            Phase.COUNTDOWN -> CountdownCenter(run.countdown, small)
+            else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Runner(
+                    beatPhase = phase,
+                    moving = moving,
+                    modifier = Modifier.size(w * 0.46f).scale(1f + 0.015f * pulse),
+                )
+                Text(
+                    Format.clock(run.remainingMs / 1000),
+                    fontSize = if (small) 38.sp else 48.sp, fontWeight = FontWeight.Black,
+                    color = JogColors.Text,
+                )
+                Text(
+                    if (run.phase == Phase.PAUSED) "已暫停" else "剩餘時間",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (run.phase == Phase.PAUSED) JogColors.Sun1.copy(alpha = blink) else JogColors.Muted,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FootRow(phase: Double, pulse: Float, moving: Boolean) {
+    val idx = floor(phase).toLong()
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text("左", color = JogColors.Faint, style = MaterialTheme.typography.labelMedium)
+        FootprintDot(if (moving && idx % 2 == 0L) pulse else 0f, JogColors.Sun1, Modifier.size(width = 22.dp, height = 30.dp))
+        FootprintDot(if (moving && idx % 2 != 0L) pulse else 0f, JogColors.Sun3, Modifier.size(width = 22.dp, height = 30.dp).padding(top = 4.dp))
+        Text("右", color = JogColors.Faint, style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+private fun StatsCard(run: RunState) {
+    JogCard(Modifier.fillMaxWidth(), padding = 14.dp) {
+        Row(Modifier.fillMaxWidth()) {
+            StatTile(Format.clock(run.elapsedMs / 1000), "已跑", Modifier.weight(1f), JogColors.Sky)
+            StatTile(Format.thousands(run.steps), "步數", Modifier.weight(1f), JogColors.Mint)
+            StatTile(Format.kcal(run.kcal), "大卡", Modifier.weight(1f), JogColors.Flame)
+        }
+    }
+}
+
+/** 跑步中調整步頻 */
+@Composable
+private fun CadenceControl(run: RunState) {
+    val ctx = LocalContext.current
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        RepeatButton("−", { JogService.send(ctx, JogService.ACTION_CADENCE, run.cadence - 1) }, size = 44.dp,
+            enabled = run.cadence > Settings.MIN_CADENCE)
+        Column(Modifier.width(100.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("${run.cadence}", style = MaterialTheme.typography.headlineSmall, color = JogColors.Text)
+            Text("步/分", style = MaterialTheme.typography.labelMedium, color = JogColors.Muted)
+        }
+        RepeatButton("+", { JogService.send(ctx, JogService.ACTION_CADENCE, run.cadence + 1) }, size = 44.dp,
+            enabled = run.cadence < Settings.MAX_CADENCE)
+    }
+}
+
+@Composable
+private fun Controls(run: RunState, pulse: Float, compact: Boolean, onStop: () -> Unit) {
+    val ctx = LocalContext.current
+    val moving = run.phase == Phase.RUNNING
+    val side = if (compact) 54.dp else 64.dp
+    val main = if (compact) 74.dp else 88.dp
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+        Box(
+            Modifier
+                .size(side)
+                .clip(CircleShape)
+                .background(JogColors.SurfaceHigh)
+                .border(1.dp, JogColors.Line, CircleShape)
+                .clickable(onClick = onStop),
+            contentAlignment = Alignment.Center,
+        ) { GlyphIcon(Glyph.STOP, JogColors.Text, Modifier.size(side * 0.4f)) }
+
+        val playScale by animateFloatAsState(if (moving) 1f + 0.04f * pulse else 1f, label = "play")
+        Box(
+            Modifier
+                .size(main)
+                .scale(playScale)
+                .clip(CircleShape)
+                .background(JogColors.sunrise)
+                .clickable(enabled = run.phase != Phase.COUNTDOWN) {
+                    if (run.phase == Phase.RUNNING) JogService.send(ctx, JogService.ACTION_PAUSE)
+                    else JogService.send(ctx, JogService.ACTION_RESUME)
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            GlyphIcon(if (run.phase == Phase.PAUSED) Glyph.PLAY else Glyph.PAUSE, Color(0xFF1A0E08), Modifier.size(main * 0.41f))
+        }
+        Spacer(Modifier.size(side)) // 視覺平衡
     }
 }
 
@@ -366,7 +437,7 @@ private fun ProgressRing(run: RunState, pulse: Float, modifier: Modifier) {
 }
 
 @Composable
-private fun CountdownCenter(n: Int) {
+private fun CountdownCenter(n: Int, small: Boolean = false) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text("準備好了嗎？", color = JogColors.Muted, style = MaterialTheme.typography.titleMedium)
         AnimatedContent(
@@ -379,7 +450,7 @@ private fun CountdownCenter(n: Int) {
         ) { v ->
             Text(
                 if (v > 0) "$v" else "GO",
-                fontSize = 120.sp, fontWeight = FontWeight.Black,
+                fontSize = if (small) 92.sp else 120.sp, fontWeight = FontWeight.Black,
                 color = JogColors.Sun1,
             )
         }
@@ -418,42 +489,36 @@ private fun ResultView(result: Session?) {
                 }
             }
         }
-        Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 22.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Spacer(Modifier.weight(0.6f))
+        val badgeView: @Composable (Dp) -> Unit = { size ->
             Box(
                 Modifier
-                    .size(132.dp)
+                    .size(size)
                     .scale(badge.value)
                     .clip(CircleShape)
                     .background(JogColors.sunrise),
                 contentAlignment = Alignment.Center,
             ) {
-                Canvas(Modifier.size(64.dp)) {
+                Canvas(Modifier.size(size * 0.48f)) {
                     val path = Path().apply {
-                        moveTo(size.width * 0.12f, size.height * 0.52f)
-                        lineTo(size.width * 0.42f, size.height * 0.8f)
-                        lineTo(size.width * 0.9f, size.height * 0.22f)
+                        moveTo(this@Canvas.size.width * 0.12f, this@Canvas.size.height * 0.52f)
+                        lineTo(this@Canvas.size.width * 0.42f, this@Canvas.size.height * 0.8f)
+                        lineTo(this@Canvas.size.width * 0.9f, this@Canvas.size.height * 0.22f)
                     }
                     val pm = PathMeasure().apply { setPath(path, false) }
                     val seg = Path()
                     pm.getSegment(0f, pm.length * check.value, seg, true)
-                    drawPath(seg, Color(0xFF1A0E08), style = Stroke(size.width * 0.12f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    drawPath(seg, Color(0xFF1A0E08), style = Stroke(this@Canvas.size.width * 0.12f, cap = StrokeCap.Round, join = StrokeJoin.Round))
                 }
             }
-            Spacer(Modifier.height(22.dp))
+        }
+        val titleView: @Composable () -> Unit = {
             Text(if (completed) "完成！" else "辛苦了！", style = MaterialTheme.typography.headlineLarge, color = JogColors.Text)
             Text(
                 if (completed) "今天也笑著跑完了 ${result?.targetMin ?: 0} 分鐘" else "提前結束也很棒，持續最重要",
                 color = JogColors.Muted, style = MaterialTheme.typography.bodyLarge,
             )
-            Spacer(Modifier.height(24.dp))
+        }
+        val statsView: @Composable () -> Unit = {
             if (result != null) {
                 JogCard(Modifier.fillMaxWidth()) {
                     Row(Modifier.fillMaxWidth()) {
@@ -472,9 +537,48 @@ private fun ResultView(result: Session?) {
                     color = JogColors.Muted, style = MaterialTheme.typography.bodyMedium,
                 )
             }
-            Spacer(Modifier.weight(1f))
-            GradientButton("完成", { RunRepository.dismissResult() }, Modifier.fillMaxWidth())
-            Spacer(Modifier.height(20.dp))
+        }
+
+        if (isLandscape()) {
+            Row(
+                Modifier
+                    .fillMaxSize()
+                    .systemBarsPadding()
+                    .displayCutoutPadding()
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    badgeView(108.dp)
+                    Spacer(Modifier.height(16.dp))
+                    titleView()
+                }
+                Spacer(Modifier.width(24.dp))
+                Column(Modifier.weight(1.2f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    statsView()
+                    Spacer(Modifier.height(16.dp))
+                    GradientButton("完成", { RunRepository.dismissResult() }, Modifier.fillMaxWidth())
+                }
+            }
+        } else {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Spacer(Modifier.weight(0.6f))
+                badgeView(132.dp)
+                Spacer(Modifier.height(22.dp))
+                titleView()
+                Spacer(Modifier.height(24.dp))
+                statsView()
+                Spacer(Modifier.weight(1f))
+                GradientButton("完成", { RunRepository.dismissResult() }, Modifier.fillMaxWidth())
+                Spacer(Modifier.height(20.dp))
+            }
         }
     }
 }

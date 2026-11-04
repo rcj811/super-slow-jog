@@ -50,6 +50,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rcj811.slowjog.Prefs
+import com.rcj811.slowjog.ScreenMode
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -239,7 +242,7 @@ fun RowScope.Spacer1() = Box(Modifier.weight(1f))
 
 // ---------------- 自繪圖示 ----------------
 
-enum class Glyph { PLAY, PAUSE, STOP, CHART, RUN, GEAR, LEFT, RIGHT, SOUND }
+enum class Glyph { PLAY, PAUSE, STOP, CHART, RUN, GEAR, LEFT, RIGHT, SOUND, PHONE, PHONE_LAND, ROTATE }
 
 @Composable
 fun GlyphIcon(glyph: Glyph, color: Color, modifier: Modifier = Modifier.size(24.dp)) {
@@ -290,6 +293,24 @@ fun DrawScope.drawGlyph(glyph: Glyph, color: Color) {
             }
             drawPath(p, color, style = Stroke(sw * 1.2f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
         }
+        Glyph.PHONE, Glyph.PHONE_LAND -> {
+            val land = glyph == Glyph.PHONE_LAND
+            val pw = if (land) w * 0.84f else w * 0.5f
+            val ph = if (land) h * 0.5f else h * 0.84f
+            val tl = Offset((w - pw) / 2, (h - ph) / 2)
+            drawRoundRect(color, tl, Size(pw, ph), CornerRadius(w * 0.1f), style = Stroke(sw))
+            val dot = if (land) Offset(tl.x + pw - w * 0.11f, h / 2) else Offset(w / 2, tl.y + ph - h * 0.11f)
+            drawCircle(color, w * 0.045f, dot)
+        }
+        Glyph.ROTATE -> {
+            drawArc(color, 200f, 250f, false, Offset(w * 0.18f, h * 0.18f), Size(w * 0.64f, h * 0.64f),
+                style = Stroke(sw, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+            // 箭頭
+            val p = Path().apply {
+                moveTo(w * 0.12f, h * 0.30f); lineTo(w * 0.25f, h * 0.47f); lineTo(w * 0.38f, h * 0.30f)
+            }
+            drawPath(p, color, style = Stroke(sw, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+        }
         Glyph.SOUND -> {
             val p = Path().apply {
                 moveTo(w * 0.12f, h * 0.38f); lineTo(w * 0.3f, h * 0.38f); lineTo(w * 0.52f, h * 0.18f)
@@ -328,4 +349,36 @@ fun ScreenTitle(title: String, subtitle: String? = null, modifier: Modifier = Mo
 @Composable
 fun Rows(spacing: Dp = 12.dp, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(spacing), content = content)
+}
+
+/** 目前畫面是否為橫向（寬 > 高） */
+@Composable
+fun isLandscape(): Boolean {
+    val c = androidx.compose.ui.platform.LocalConfiguration.current
+    return c.screenWidthDp > c.screenHeightDp
+}
+
+fun ScreenMode.glyph(): Glyph = when (this) {
+    ScreenMode.PORTRAIT -> Glyph.PHONE
+    ScreenMode.LANDSCAPE -> Glyph.PHONE_LAND
+    ScreenMode.AUTO -> Glyph.ROTATE
+}
+
+/** 點一下在 直向 → 橫向 → 自動旋轉 之間切換 */
+@Composable
+fun ScreenModeChip(modifier: Modifier = Modifier) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val s by Prefs.settings.collectAsStateWithLifecycle()
+    Row(
+        modifier
+            .clip(RoundedCornerShape(50))
+            .background(JogColors.SurfaceHigh)
+            .clickable { Prefs.update(ctx) { it.copy(screenMode = it.screenMode.next()) } }
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        GlyphIcon(s.screenMode.glyph(), JogColors.Muted, Modifier.size(18.dp))
+        androidx.compose.foundation.layout.Spacer(Modifier.size(4.dp))
+        Text(s.screenMode.label, color = JogColors.Muted, style = MaterialTheme.typography.labelMedium)
+    }
 }

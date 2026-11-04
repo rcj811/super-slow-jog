@@ -7,6 +7,13 @@ import kotlinx.coroutines.flow.asStateFlow
 
 enum class VoiceGender(val label: String) { FEMALE("女聲"), MALE("男聲") }
 
+/** 畫面方向：直向、橫向、依手機轉向自動旋轉 */
+enum class ScreenMode(val label: String) {
+    PORTRAIT("直向"), LANDSCAPE("橫向"), AUTO("自動旋轉");
+
+    fun next(): ScreenMode = entries[(ordinal + 1) % entries.size]
+}
+
 /** 使用者設定：時間（10 分鐘為單位）、步頻 150–250、體重、聲音等。 */
 data class Settings(
     val durationMin: Int = 30,
@@ -23,6 +30,7 @@ data class Settings(
     val reminderOn: Boolean = true,
     val countdownOn: Boolean = true,
     val keepScreenOn: Boolean = true,
+    val screenMode: ScreenMode = ScreenMode.PORTRAIT,
 ) {
     companion object {
         const val MIN_DURATION = 10
@@ -68,6 +76,9 @@ object Prefs {
             reminderOn = p.getBoolean("reminderOn", d.reminderOn),
             countdownOn = p.getBoolean("countdownOn", d.countdownOn),
             keepScreenOn = p.getBoolean("keepScreenOn", d.keepScreenOn),
+            screenMode = runCatching {
+                ScreenMode.valueOf(p.getString("screenMode", d.screenMode.name)!!)
+            }.getOrDefault(d.screenMode),
         )
         loaded = true
     }
@@ -96,6 +107,7 @@ object Prefs {
             .putBoolean("reminderOn", s.reminderOn)
             .putBoolean("countdownOn", s.countdownOn)
             .putBoolean("keepScreenOn", s.keepScreenOn)
+            .putString("screenMode", s.screenMode.name)
             .apply()
     }
 }

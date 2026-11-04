@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -42,6 +44,7 @@ import com.rcj811.slowjog.BeatSound
 import com.rcj811.slowjog.Calories
 import com.rcj811.slowjog.Prefs
 import com.rcj811.slowjog.PreviewPlayer
+import com.rcj811.slowjog.ScreenMode
 import com.rcj811.slowjog.VoiceGender
 import com.rcj811.slowjog.VoiceOption
 import java.util.Locale
@@ -69,6 +72,8 @@ fun SettingsScreen() {
     Column(
         Modifier
             .fillMaxSize()
+            .wrapContentWidth(Alignment.CenterHorizontally)
+            .widthIn(max = 720.dp)
             .verticalScroll(rememberScrollState())
             .statusBarsPadding()
             .padding(horizontal = 18.dp),
@@ -207,7 +212,20 @@ fun SettingsScreen() {
 
         // ---- 螢幕 ----
         JogCard {
-            SectionLabel("其他")
+            SectionLabel("畫面方向")
+            Spacer(Modifier.height(10.dp))
+            Segmented(
+                ScreenMode.entries.map { it.label },
+                ScreenMode.entries.indexOf(s.screenMode),
+                { i -> Prefs.update(ctx) { it.copy(screenMode = ScreenMode.entries[i]) } },
+                Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "橫向適合放在跑步機或桌上；跑步畫面右上角也能快速切換。",
+                color = JogColors.Faint, style = MaterialTheme.typography.bodyMedium,
+            )
+            HorizontalDivider(Modifier.padding(vertical = 8.dp), color = JogColors.Line)
             SwitchRow("跑步時螢幕保持開啟", "關閉後鎖螢幕也會繼續計時與播放節拍", s.keepScreenOn) { v -> Prefs.update(ctx) { it.copy(keepScreenOn = v) } }
         }
 
