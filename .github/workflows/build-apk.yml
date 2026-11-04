@@ -1,0 +1,91 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: 編譯 APK
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # 使用 runner 預裝的 Android SDK
+      - name: 準備 Android SDK
+        run: |
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKM="$(ls -d "$SDK"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" --install "platforms;android-34" "build-tools;34.0.0" > /dev/null
+
+      - name: 還原固定簽章
+        run: base64 -d ci/debug.keystore.b64 > ci/debug.keystore
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+
+      - name: 測試並編譯
+        run: |
+          set -o pipefail
+          gradle :app:testDebugUnitTest :app:assembleRelease --stacktrace --no-daemon 2>&1 | tee build.log
+
+      # 把結果與錯誤摘要推到 ci-logs 分支，方便不用登入也能查看
+      - name: 保存建置紀錄
+        if: always()
+        run: |
+          {
+            echo "run=${{ github.run_number }} status=${{ job.status }} sha=${{ github.sha }}"
+            echo "---- errors ----"
+            grep -E "^e: |error:|FAILED|What went wrong|Exception|expected:<" -A4 build.log | head -250 || true
+            echo "---- tail ----"
+            tail -80 build.log || true
+          } > summary.txt
+          git config user.name "ci-bot"
+          git config user.email "ci-bot@users.noreply.github.com"
+          cp summary.txt /tmp/summary.txt
+          git fetch origin ci-logs || true
+          git checkout --orphan ci-logs-tmp
+          git rm -rf --cached . > /dev/null
+          mkdir -p logs && cp /tmp/summary.txt logs/latest.txt
+          git add -f logs/latest.txt
+          git commit -m "CI ${{ github.run_number }}: ${{ job.status }}" > /dev/null
+          git push -f origin HEAD:ci-logs
+
+      - name: 整理檔名
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk "super-slow-jog-${{ github.run_number }}.apk"
+          cp app/build/outputs/apk/release/app-release.apk super-slow-jog.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: super-slow-jog-apk
+          path: super-slow-jog-${{ github.run_number }}.apk
+
+      - name: 發布到 Releases（手機可直接下載）
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: 超慢跑 build ${{ github.run_number }}
+          body: 由 commit ${{ github.sha }} 自動編譯。下載 super-slow-jog.apk 安裝即可（首次需允許安裝未知來源 App）。之後的新版可直接覆蓋安裝，紀錄會保留。
+          files: |
+            super-slow-jog-${{ github.run_number }}.apk
+            super-slow-jog.apk
+          prerelease: false
+          make_latest: true
