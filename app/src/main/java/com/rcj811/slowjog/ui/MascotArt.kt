@@ -283,9 +283,11 @@ fun DrawScope.drawMascot(mascot: Mascot, ps: JogPose, t: Float, avatar: ImageBit
             Mascot.CAPYBARA -> p.capybara(ps, t)
             Mascot.RABBIT -> p.rabbit(ps, t)
             Mascot.PANDA -> p.panda(ps, t)
-            Mascot.PHOTO -> p.photo(ps, avatar)
+            Mascot.PHOTO -> p.photoBody(ps)
         }
     }
+    // 自訂照片：頭像固定不動（不彈跳、不壓縮、暫停時也不晃），只有身體在跑
+    if (mascot == Mascot.PHOTO) p.photoHead(avatar)
 }
 
 // ---------------- 角色 ----------------
@@ -536,12 +538,13 @@ private fun Pen.panda(ps: JogPose, t: Float) {
     mouth(50f, hy + 8.2f, 2f, if (talking(ps)) 0.7f else 0f)
 }
 
-/** 用自己的照片當頭 */
-private fun Pen.photo(ps: JogPose, avatar: ImageBitmap?) {
-    val dy = -ps.bounce * 4f
+/** 自訂照片角色的身體（會跟著節拍跑） */
+private fun Pen.photoBody(ps: JogPose) {
+    val dy = -min(ps.bounce, 1f) * 4f // 頭固定，身體不要跳太高鑽到頭後面
     val skin = Color(0xFFFFD9B8); val shirt = Color(0xFFFF7A45); val bottom = Color(0xFF2E4057)
     shadow(ps)
     legs(ps, dy, 74f, 44.5f, 55.5f, skin, 4.6f, sneaker(WHITE, shirt))
+    rrect(skin, 47f, 45f + dy, 6f, 9f, 3f) // 脖子（被頭像蓋住上半段）
     rrect(bottom, 38.5f, 67f + dy, 23f, 10f, 4f)
     rrect(shirt, 37f, 52f + dy, 26f, 18f, 9f)
     circle(WHITE.copy(alpha = 0.75f), 50f, 60f + dy, 2.4f)
@@ -550,7 +553,11 @@ private fun Pen.photo(ps: JogPose, avatar: ImageBitmap?) {
         arm(ps, sx, 56f + dy, side, skin, 3.9f, ball(skin, 2.6f))
         circle(shirt, sx, 55.5f + dy, 3.6f)
     }
-    val hy = 30f + dy + ps.wobble * 0.6f
+}
+
+/** 自訂照片角色的頭：固定位置，不隨節拍移動 */
+private fun Pen.photoHead(avatar: ImageBitmap?) {
+    val hy = 29f
     circle(WHITE, 50f, hy, 20.5f)
     if (avatar != null) {
         val c = o(50f, hy)
