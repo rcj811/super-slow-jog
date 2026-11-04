@@ -107,7 +107,7 @@ fun SetupScreen(onStart: () -> Unit) {
     val durationCard: @Composable () -> Unit = {
         // 時間
         JogCard {
-            SectionLabel("跑步時間（每格 10 分鐘）")
+            SectionLabel("跑步時間（每格 10 分鐘，最長 120 分鐘）")
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
                 RepeatButton("−", { Prefs.update(ctx) { it.copy(durationMin = it.durationMin - Settings.DURATION_STEP) } },
                     enabled = s.durationMin > Settings.MIN_DURATION)
@@ -121,8 +121,8 @@ fun SetupScreen(onStart: () -> Unit) {
                 RepeatButton("+", { Prefs.update(ctx) { it.copy(durationMin = it.durationMin + Settings.DURATION_STEP) } },
                     enabled = s.durationMin < Settings.MAX_DURATION)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(10, 20, 30, 40, 60).forEach { m ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                listOf(10, 20, 30, 40, 50, 60, 90, 120).forEach { m ->
                     Chip("$m", s.durationMin == m, { Prefs.update(ctx) { it.copy(durationMin = m) } })
                 }
             }

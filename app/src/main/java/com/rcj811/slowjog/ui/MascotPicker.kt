@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rcj811.slowjog.AvatarSource
 import com.rcj811.slowjog.AvatarStore
 import com.rcj811.slowjog.Mascot
 import com.rcj811.slowjog.Prefs
@@ -50,19 +51,53 @@ fun MascotPicker(modifier: Modifier = Modifier, columns: Int = 3) {
     val avatar by AvatarStore.image.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var importing by remember { mutableStateOf(false) }
+    var cropSource by remember { mutableStateOf<AvatarSource?>(null) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
             importing = true
             scope.launch {
-                val ok = AvatarStore.importFrom(ctx, uri)
+                val src = AvatarStore.loadFromUri(ctx, uri)
                 importing = false
-                if (ok) Prefs.update(ctx) { it.copy(mascot = Mascot.PHOTO) }
-                else Toast.makeText(ctx, "這張照片無法讀取，請換一張試試", Toast.LENGTH_SHORT).show()
+                if (src == null) {
+                    Toast.makeText(ctx, "這張照片無法讀取，請換一張試試", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+                cropSource = src
             }
         }
     }
     val pickPhoto = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+    val adjustPhoto: () -> Unit = {
+        importing = true
+        scope.launch {
+            val src = AvatarStore.loadSaved(ctx)
+            importing = false
+            if (src == null) {
+                pickPhoto()
+                return@launch
+            }
+            cropSource = src
+        }
+    }
+
+    cropSource?.let { src ->
+        AvatarCropDialog(
+            source = src,
+            onCancel = { cropSource = null },
+            onRepick = { cropSource = null; pickPhoto() },
+            onConfirm = { circle ->
+                cropSource = null
+                importing = true
+                scope.launch {
+                    val ok = AvatarStore.applyCrop(ctx, src, circle)
+                    importing = false
+                    if (ok) Prefs.update(ctx) { it.copy(mascot = Mascot.PHOTO) }
+                    else Toast.makeText(ctx, "頭像儲存失敗，請再試一次", Toast.LENGTH_SHORT).show()
+                }
+            },
+        )
+    }
 
     Column(modifier) {
         Mascot.entries.chunked(columns).forEach { row ->
@@ -101,28 +136,28 @@ fun MascotPicker(modifier: Modifier = Modifier, columns: Int = 3) {
         }
         if (avatar != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "我的照片：",
-                    color = JogColors.Muted, style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    "更換照片", color = JogColors.Sky, style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { pickPhoto() }.padding(8.dp),
-                )
-                Text(
-                    "移除", color = JogColors.Muted, style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable {
-                        AvatarStore.clear(ctx)
-                        if (Prefs.settings.value.mascot == Mascot.PHOTO) Prefs.update(ctx) { it.copy(mascot = Mascot.DUCK) }
-                    }.padding(8.dp),
-                )
+                Text("我的照片：", color = JogColors.Muted, style = MaterialTheme.typography.bodyMedium)
+                PickerAction("調整位置", JogColors.Sun1) { adjustPhoto() }
+                PickerAction("更換照片", JogColors.Sky) { pickPhoto() }
+                PickerAction("移除", JogColors.Muted) {
+                    AvatarStore.clear(ctx)
+                    if (Prefs.settings.value.mascot == Mascot.PHOTO) Prefs.update(ctx) { it.copy(mascot = Mascot.DUCK) }
+                }
             }
         }
         Text(
-            "「我的照片」會自動找到臉並裁成圓形頭像（寵物照也可以），照片只存在這支手機裡。",
+            "「我的照片」選好照片後，可以拖曳圓圈選擇要當頭像的位置、兩指縮放大小（寵物照也可以）。照片只存在這支手機裡。",
             color = JogColors.Faint, style = MaterialTheme.typography.bodyMedium,
         )
     }
+}
+
+@Composable
+private fun PickerAction(text: String, color: androidx.compose.ui.graphics.Color, onClick: () -> Unit) {
+    Text(
+        text, color = color, style = MaterialTheme.typography.labelLarge,
+        modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(8.dp),
+    )
 }
 
 /** 首頁的角色卡：角色跟著步頻原地跑，點一下換角色 */

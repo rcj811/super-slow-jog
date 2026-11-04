@@ -38,7 +38,7 @@ data class Settings(
 ) {
     companion object {
         const val MIN_DURATION = 10
-        const val MAX_DURATION = 180
+        const val MAX_DURATION = 120
         const val DURATION_STEP = 10
         const val MIN_CADENCE = 160
         const val MAX_CADENCE = 220

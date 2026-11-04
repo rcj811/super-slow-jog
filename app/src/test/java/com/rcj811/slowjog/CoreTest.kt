@@ -24,7 +24,9 @@ class CoreTest {
     @Test fun durationSnapsToTenMinutes() {
         assertEquals(10, Settings.clampDuration(3))
         assertEquals(30, Settings.clampDuration(26))
-        assertEquals(180, Settings.clampDuration(999))
+        assertEquals(120, Settings.clampDuration(999))
+        assertEquals(120, Settings.clampDuration(130))
+        assertEquals(50, Settings.clampDuration(50))
         assertEquals(40, Settings.clampDuration(40))
     }
 
@@ -95,6 +97,19 @@ class CoreTest {
         // 暫停時雙腳著地
         val idle = com.rcj811.slowjog.ui.jogPose(0.5, false, 1f, false)
         assertEquals(0f, idle.liftL + idle.liftR, 0.001f)
+    }
+
+    @Test fun cropCircleStaysInsidePhoto() {
+        // 1000×600 的照片：圓最大半徑 300
+        val big = CropCircle.clamp(CropCircle(500f, 300f, 900f), 1000f, 600f)
+        assertEquals(300f, big.r, 0.01f)
+        // 拖到邊緣外會被擋在照片內
+        val edge = CropCircle.clamp(CropCircle(-50f, 700f, 100f), 1000f, 600f)
+        assertEquals(100f, edge.cx, 0.01f)
+        assertEquals(500f, edge.cy, 0.01f)
+        // 太小會被放大到最小半徑
+        val tiny = CropCircle.clamp(CropCircle(500f, 300f, 1f), 1000f, 600f)
+        assertEquals(CropCircle.minRadius(1000f, 600f), tiny.r, 0.01f)
     }
 
     @Test fun mascotIds() {
