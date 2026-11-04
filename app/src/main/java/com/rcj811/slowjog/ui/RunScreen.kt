@@ -180,24 +180,8 @@ private fun ActiveRun(run: RunState, s: Settings) {
 
             // 里程碑橫幅
             Box(Modifier.fillMaxWidth().height(52.dp), contentAlignment = Alignment.Center) {
-                AnimatedVisibility(
-                    visible = showBanner,
-                    enter = slideInVertically { -it } + fadeIn(),
-                    exit = slideOutVertically { -it } + fadeOut(),
-                ) {
-                    Box(
-                        Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(JogColors.sunriseH)
-                            .padding(horizontal = 18.dp, vertical = 8.dp)
-                    ) {
-                        val done = bannerFor * Settings.REMINDER_EVERY_MIN
-                        Text(
-                            "🎉 已完成 $done 分鐘・還剩 ${run.targetMin - done} 分鐘",
-                            color = Color(0xFF1A0E08), fontWeight = FontWeight.Bold, fontSize = 15.sp,
-                        )
-                    }
-                }
+                val done = bannerFor * Settings.REMINDER_EVERY_MIN
+                MilestoneBanner(showBanner, "🎉 已完成 $done 分鐘・還剩 ${run.targetMin - done} 分鐘")
             }
 
             // 主圓環
@@ -309,6 +293,24 @@ private fun ActiveRun(run: RunState, s: Settings) {
             },
             dismissButton = { TextButton(onClick = { confirmStop = false }) { Text("繼續跑", color = JogColors.Text) } },
         )
+    }
+}
+
+@Composable
+private fun MilestoneBanner(visible: Boolean, text: String) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInVertically { -it } + fadeIn(),
+        exit = slideOutVertically { -it } + fadeOut(),
+    ) {
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(JogColors.sunriseH)
+                .padding(horizontal = 18.dp, vertical = 8.dp)
+        ) {
+            Text(text, color = Color(0xFF1A0E08), fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        }
     }
 }
 
