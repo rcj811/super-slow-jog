@@ -45,6 +45,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rcj811.slowjog.Announcer
 import com.rcj811.slowjog.AvatarStore
 import com.rcj811.slowjog.SessionStore
+import com.rcj811.slowjog.Settings
 import com.rcj811.slowjog.BeatSound
 import com.rcj811.slowjog.Calories
 import com.rcj811.slowjog.DailyReminder
@@ -179,7 +180,8 @@ fun SettingsScreen() {
                 )
                 Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val current = voices.firstOrNull { it.name == s.voiceName }?.label ?: "自動（依男女聲挑選）"
+                    val current = (if (s.voiceName == Settings.FIRST_VOICE) voices.firstOrNull() else voices.firstOrNull { it.name == s.voiceName })
+                        ?.label ?: "自動（依男女聲挑選）"
                     Column(
                         Modifier
                             .weight(1f)
@@ -206,8 +208,8 @@ fun SettingsScreen() {
                     VoiceItem("自動（依男女聲挑選）", s.voiceName.isEmpty()) {
                         Prefs.update(ctx) { it.copy(voiceName = "") }; showVoiceList = false; sayDemo()
                     }
-                    voices.forEach { v ->
-                        VoiceItem(v.label, s.voiceName == v.name) {
+                    voices.forEachIndexed { i, v ->
+                        VoiceItem(v.label, s.voiceName == v.name || (i == 0 && s.voiceName == Settings.FIRST_VOICE)) {
                             Prefs.update(ctx) { it.copy(voiceName = v.name, voiceGender = v.gender ?: it.voiceGender) }
                             showVoiceList = false; sayDemo()
                         }

@@ -101,7 +101,8 @@ class Announcer(context: Context, private val onReady: (() -> Unit)? = null) : T
         val t = tts ?: return
         if (!chineseAvailable) return
         val voices = VoicePicker.chineseVoices(t)
-        val chosen = voices.firstOrNull { s.voiceName.isNotEmpty() && it.name == s.voiceName }
+        val chosen = if (s.voiceName == Settings.FIRST_VOICE) voices.firstOrNull()
+        else voices.firstOrNull { s.voiceName.isNotEmpty() && it.name == s.voiceName }
         if (chosen != null) {
             runCatching { t.setVoice(chosen) }
             t.setPitch(1.0f)

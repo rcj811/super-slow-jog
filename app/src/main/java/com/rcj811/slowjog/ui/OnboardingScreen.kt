@@ -71,9 +71,12 @@ fun OnboardingScreen() {
 
     BackHandler(enabled = step > 0) { step-- }
 
+    val requestNotif = rememberNotificationPermissionRequest()
     val finish = {
         Prefs.update(ctx) { it.copy(onboarded = true) }
         DailyReminder.schedule(ctx)
+        // 每日提醒預設開啟：完成設定時請求通知權限
+        if (Prefs.settings.value.dailyReminderOn) requestNotif()
     }
 
     val preview: @Composable (Modifier) -> Unit = { m ->

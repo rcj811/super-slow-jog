@@ -163,6 +163,16 @@ class CoreTest {
         assertEquals(listOf("AAAAAAAAAAA", "BBBBBBBBBBB"), many)
     }
 
+    @Test fun defaults() {
+        val d = Settings()
+        assertEquals(ScreenMode.AUTO, d.screenMode)
+        assertTrue(d.dailyReminderOn)
+        assertEquals(20, d.dailyHour)
+        assertEquals(30, d.dailyMinute)
+        assertEquals(BeatSound.METRONOME, d.beatSound)
+        assertEquals(Settings.FIRST_VOICE, d.voiceName)
+    }
+
     @Test fun mascotIds() {
         assertEquals(Mascot.CAPYBARA, Mascot.fromId("CAPYBARA"))
         assertEquals(Mascot.DUCK, Mascot.fromId("unknown"))

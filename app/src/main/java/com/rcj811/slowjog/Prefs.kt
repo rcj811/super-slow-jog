@@ -25,9 +25,9 @@ data class Settings(
     /** 是否已完成第一次設定 */
     val onboarded: Boolean = false,
     /** 每日運動提醒 */
-    val dailyReminderOn: Boolean = false,
-    val dailyHour: Int = 19,
-    val dailyMinute: Int = 0,
+    val dailyReminderOn: Boolean = true,
+    val dailyHour: Int = 20,
+    val dailyMinute: Int = 30,
     /** 跑步時播放 YouTube（取代角色區） */
     val ytOn: Boolean = false,
     val ytVolume: Int = 60,
@@ -36,17 +36,17 @@ data class Settings(
     val volume: Float = 0.8f,
     /** 語音提醒音量 0–1 */
     val voiceVolume: Float = 1.0f,
-    val beatSound: BeatSound = BeatSound.WATER,
+    val beatSound: BeatSound = BeatSound.METRONOME,
     val alternateTone: Boolean = true,
     val voiceOn: Boolean = true,
     val voiceGender: VoiceGender = VoiceGender.FEMALE,
-    /** 指定的 TTS 聲音名稱；空字串 = 依男女聲自動挑選 */
-    val voiceName: String = "",
+    /** 指定的 TTS 聲音名稱；空字串 = 依男女聲自動挑選；FIRST_VOICE = 清單第一個（台灣優先） */
+    val voiceName: String = FIRST_VOICE,
     val vibrateOn: Boolean = true,
     val reminderOn: Boolean = true,
     val countdownOn: Boolean = true,
     val keepScreenOn: Boolean = true,
-    val screenMode: ScreenMode = ScreenMode.PORTRAIT,
+    val screenMode: ScreenMode = ScreenMode.AUTO,
     val mascot: Mascot = Mascot.DUCK,
 ) {
     companion object {
@@ -58,6 +58,8 @@ data class Settings(
         const val CADENCE_STEP = 5
         const val REMINDER_EVERY_MIN = 5
         const val COUNTDOWN_SEC = 3
+        /** 預設語音：聲音 1（清單第一個，台灣中文優先） */
+        const val FIRST_VOICE = "@first"
         const val MAX_BEAT_VOLUME = 1.5f
         const val MIN_HEIGHT = 100
         const val MAX_HEIGHT = 220

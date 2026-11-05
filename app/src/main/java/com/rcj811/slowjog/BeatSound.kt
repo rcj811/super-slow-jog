@@ -19,7 +19,7 @@ enum class BeatSound(val label: String, val desc: String) {
     DRUM("輕鼓", "低沉的咚咚聲，像踏在地上的腳步");
 
     companion object {
-        fun fromId(id: String?): BeatSound = entries.firstOrNull { it.name == id } ?: WATER
+        fun fromId(id: String?): BeatSound = entries.firstOrNull { it.name == id } ?: METRONOME
     }
 }
 
