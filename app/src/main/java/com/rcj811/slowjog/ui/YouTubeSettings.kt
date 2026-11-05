@@ -106,10 +106,8 @@ fun YouTubeSettingsCard() {
         SwitchRow("最小化或關螢幕時繼續播放", "切到其他 App 或關掉螢幕，YouTube 聲音不中斷（跑步中有效）", s.ytBackground) { v ->
             Prefs.update(ctx) { it.copy(ytBackground = v) }
         }
-        Spacer(Modifier.height(4.dp))
-        YouTubeVolumeSlider()
         Text(
-            "YouTube 音量與節拍、語音分開調整；跑步中點右上角的喇叭也能調。",
+            "YouTube 音量在上方「音量」區調整（和裝置音量放在一起）；跑步中點右上角的喇叭也能調。",
             color = JogColors.Faint, style = MaterialTheme.typography.bodyMedium,
         )
 

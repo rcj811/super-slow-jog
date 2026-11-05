@@ -117,17 +117,16 @@ fun VolumeControls(onBeatTest: (() -> Unit)?, onVoiceTest: (() -> Unit)?) {
             colors = volumeSliderColors(),
         )
 
-        if (s.ytOn) {
-            Spacer(Modifier.height(14.dp))
-            YouTubeVolumeSlider()
-        }
+        Spacer(Modifier.height(14.dp))
+        YouTubeVolumeSlider()
         }
 
         Spacer(Modifier.height(14.dp))
         PhoneMediaVolume()
         Text(
-            if (locked) "統一音量開啟中：所有聲音都由「裝置音量」控制，上方的個別音量已停用。"
-            else "個別音量是「裝置音量」的比例。節拍超過 100% 會加強但不破音；若還是太小聲，請調大裝置音量（也會影響音樂）。",
+            (if (locked) "統一音量開啟中：本 App 的聲音都由「裝置音量」控制，上方的個別音量已停用。"
+            else "個別音量是「裝置音量」的比例。節拍超過 100% 會加強但不破音。") +
+                "\n裝置音量是整支手機共用的媒體音量，在這裡調整後，瀏覽器、YouTube App、音樂等其他 App 也會一起變大或變小；統一音量開關本身只影響本 App。",
             color = JogColors.Faint, style = MaterialTheme.typography.bodyMedium,
         )
     }
