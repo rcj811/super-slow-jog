@@ -28,6 +28,10 @@ data class Settings(
     val dailyReminderOn: Boolean = false,
     val dailyHour: Int = 19,
     val dailyMinute: Int = 0,
+    /** 跑步時播放 YouTube（取代角色區） */
+    val ytOn: Boolean = false,
+    val ytVolume: Int = 60,
+    val ytShuffle: Boolean = false,
     /** 節拍音量 0–1.5（超過 100% 以柔和限幅放大） */
     val volume: Float = 0.8f,
     /** 語音提醒音量 0–1 */
@@ -93,6 +97,9 @@ object Prefs {
             dailyReminderOn = p.getBoolean("dailyReminderOn", d.dailyReminderOn),
             dailyHour = p.getInt("dailyHour", d.dailyHour).coerceIn(0, 23),
             dailyMinute = p.getInt("dailyMinute", d.dailyMinute).coerceIn(0, 59),
+            ytOn = p.getBoolean("ytOn", d.ytOn),
+            ytVolume = p.getInt("ytVolume", d.ytVolume).coerceIn(0, 100),
+            ytShuffle = p.getBoolean("ytShuffle", d.ytShuffle),
             volume = p.getFloat("volume", d.volume).coerceIn(0f, Settings.MAX_BEAT_VOLUME),
             voiceVolume = p.getFloat("voiceVolume", d.voiceVolume).coerceIn(0f, 1f),
             beatSound = BeatSound.fromId(p.getString("beatSound", d.beatSound.name)),
@@ -123,6 +130,7 @@ object Prefs {
                 weightKg = it.weightKg.coerceIn(Settings.MIN_WEIGHT, Settings.MAX_WEIGHT),
                 dailyHour = Math.floorMod(it.dailyHour, 24),
                 dailyMinute = Math.floorMod(it.dailyMinute, 60),
+                ytVolume = it.ytVolume.coerceIn(0, 100),
                 volume = it.volume.coerceIn(0f, Settings.MAX_BEAT_VOLUME),
                 voiceVolume = it.voiceVolume.coerceIn(0f, 1f),
             )
@@ -138,6 +146,9 @@ object Prefs {
             .putBoolean("dailyReminderOn", s.dailyReminderOn)
             .putInt("dailyHour", s.dailyHour)
             .putInt("dailyMinute", s.dailyMinute)
+            .putBoolean("ytOn", s.ytOn)
+            .putInt("ytVolume", s.ytVolume)
+            .putBoolean("ytShuffle", s.ytShuffle)
             .putFloat("volume", s.volume)
             .putFloat("voiceVolume", s.voiceVolume)
             .putString("beatSound", s.beatSound.name)

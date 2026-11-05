@@ -122,6 +122,9 @@ fun SettingsScreen() {
             DailyReminderEditor()
         }
 
+        // ---- YouTube ----
+        YouTubeSettingsCard()
+
         // ---- 陪跑角色 ----
         JogCard {
             SectionLabel("陪跑角色（原地超慢跑動畫）")

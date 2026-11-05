@@ -105,6 +105,11 @@ fun VolumeControls(onBeatTest: (() -> Unit)?, onVoiceTest: (() -> Unit)?) {
             colors = volumeSliderColors(),
         )
 
+        if (s.ytOn) {
+            Spacer(Modifier.height(14.dp))
+            YouTubeVolumeSlider()
+        }
+
         Spacer(Modifier.height(14.dp))
         PhoneMediaVolume()
         Text(

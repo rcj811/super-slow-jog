@@ -146,6 +146,23 @@ class CoreTest {
         assertEquals("早上 07:05", DailyReminder.timeText(7, 5))
     }
 
+    @Test fun youtubeLinks() {
+        val id = "dQw4w9WgXcQ"
+        assertEquals(id, YouTubeStore.extractId("https://www.youtube.com/watch?v=$id"))
+        assertEquals(id, YouTubeStore.extractId("https://youtu.be/$id?si=abc123"))
+        assertEquals(id, YouTubeStore.extractId("https://m.youtube.com/watch?feature=share&v=$id&t=30"))
+        assertEquals(id, YouTubeStore.extractId("https://www.youtube.com/shorts/$id"))
+        assertEquals(id, YouTubeStore.extractId("https://music.youtube.com/watch?v=$id&list=RDAMVM"))
+        assertEquals(id, YouTubeStore.extractId(id))
+        assertNull(YouTubeStore.extractId("https://example.com/watch?v=$id"))
+        assertNull(YouTubeStore.extractId("hello"))
+        // 一次貼上多個（含重複、雜訊）
+        val many = YouTubeStore.extractAll(
+            "https://youtu.be/AAAAAAAAAAA\nhttps://www.youtube.com/watch?v=BBBBBBBBBBB , 看這個 https://youtu.be/AAAAAAAAAAA"
+        )
+        assertEquals(listOf("AAAAAAAAAAA", "BBBBBBBBBBB"), many)
+    }
+
     @Test fun mascotIds() {
         assertEquals(Mascot.CAPYBARA, Mascot.fromId("CAPYBARA"))
         assertEquals(Mascot.DUCK, Mascot.fromId("unknown"))

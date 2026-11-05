@@ -92,6 +92,7 @@ import com.rcj811.slowjog.Session
 import com.rcj811.slowjog.SessionStore
 import com.rcj811.slowjog.Settings
 import com.rcj811.slowjog.Stats
+import com.rcj811.slowjog.YouTubeStore
 import com.rcj811.slowjog.Totals
 import kotlinx.coroutines.delay
 import java.time.LocalDate
@@ -121,6 +122,9 @@ fun RunScreen(run: RunState) {
 private fun ActiveRun(run: RunState, s: Settings) {
     val ctx = LocalContext.current
     val moving = run.phase == Phase.RUNNING
+    // 有設定 YouTube 時，角色區換成 YouTube 播放器
+    val ytItems by YouTubeStore.items.collectAsStateWithLifecycle()
+    val yt = if (s.ytOn && ytItems.isNotEmpty()) rememberYtController(ytItems, s.ytShuffle) else null
     var confirmStop by remember { mutableStateOf(false) }
     val landscape = isLandscape()
 
@@ -168,10 +172,14 @@ private fun ActiveRun(run: RunState, s: Settings) {
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                RingArea(
-                    run, s, moving,
-                    Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true),
-                )
+                if (yt != null) {
+                    YtArea(run, s, yt, Modifier.weight(1.35f).fillMaxHeight())
+                } else {
+                    RingArea(
+                        run, s, moving,
+                        Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true),
+                    )
+                }
                 Spacer(Modifier.width(20.dp))
                 Column(
                     Modifier.weight(1f).fillMaxHeight(),
@@ -202,7 +210,8 @@ private fun ActiveRun(run: RunState, s: Settings) {
                 Box(Modifier.fillMaxWidth().height(52.dp), contentAlignment = Alignment.Center) {
                     MilestoneBanner(showBanner, bannerText)
                 }
-                RingArea(run, s, moving, Modifier.fillMaxWidth(0.86f).aspectRatio(1f))
+                if (yt != null) YtArea(run, s, yt, Modifier.fillMaxWidth())
+                else RingArea(run, s, moving, Modifier.fillMaxWidth(0.86f).aspectRatio(1f))
                 Spacer(Modifier.height(16.dp))
                 StatsCard(run)
                 Spacer(Modifier.height(10.dp))
@@ -267,6 +276,69 @@ private fun RunHeader(run: RunState, s: Settings) {
 }
 
 /** 進度圓環 + 原地跑角色 + 剩餘時間（大小隨可用空間縮放） */
+/** YouTube 播放區：上方剩餘時間與進度條，下方播放器與曲目切換 */
+@Composable
+private fun YtArea(run: RunState, s: Settings, yt: YtController, modifier: Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+            Text(
+                Format.clock(run.remainingMs / 1000),
+                fontSize = 52.sp, fontWeight = FontWeight.Black, color = JogColors.Text,
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                when (run.phase) {
+                    Phase.PAUSED -> "已暫停"
+                    Phase.COUNTDOWN -> "準備開始"
+                    else -> "剩餘時間"
+                },
+                color = if (run.phase == Phase.PAUSED) JogColors.Sun1 else JogColors.Muted,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 10.dp),
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                "${Math.round(run.progress * 100)}%",
+                color = JogColors.Sun1, style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 10.dp),
+            )
+        }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(50))
+                .background(JogColors.SurfaceHigh)
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth(run.progress)
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(JogColors.sunriseH)
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .aspectRatio(16f / 9f),
+            contentAlignment = Alignment.Center,
+        ) {
+            YouTubePlayerBox(yt, playing = run.phase == Phase.RUNNING, volume = s.ytVolume, modifier = Modifier.fillMaxSize())
+            if (run.phase == Phase.COUNTDOWN) {
+                Box(
+                    Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp)).background(Color.Black.copy(alpha = 0.78f)),
+                    contentAlignment = Alignment.Center,
+                ) { CountdownCenter(run.countdown, small = true) }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        YouTubeTrackBar(yt)
+    }
+}
+
 @Composable
 private fun RingArea(run: RunState, s: Settings, moving: Boolean, modifier: Modifier) {
     BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
