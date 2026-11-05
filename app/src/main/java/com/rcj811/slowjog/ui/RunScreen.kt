@@ -338,7 +338,7 @@ private fun YtArea(run: RunState, s: Settings, yt: YtController, modifier: Modif
                 ) { CountdownCenter(run.countdown, small = true) }
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
         YouTubeTrackBar(yt)
     }
 }

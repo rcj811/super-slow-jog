@@ -18,6 +18,9 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -196,16 +199,39 @@ class YtController(context: Context, items: List<YtItem>, shuffle: Boolean) {
         host = root
     }
 
-    /** 移動、縮放播放器到指定位置（相對於 host） */
+    private var target = intArrayOf(0, 0, 1, 1)
+
+    /**
+     * 移動、縮放播放器到指定位置（相對於 host）。
+     * 在版面計算當中直接改 LayoutParams 有時不會生效（旋轉後會保留舊尺寸），
+     * 所以排到下一個時機套用，並在套用後確認實際大小，不對就再套一次。
+     */
     fun place(left: Int, top: Int, w: Int, h: Int) {
-        val lp = (web.layoutParams as? FrameLayout.LayoutParams) ?: FrameLayout.LayoutParams(w, h)
-        if (lp.width == w && lp.height == h && lp.leftMargin == left && lp.topMargin == top) return
-        lp.width = w
-        lp.height = h
-        lp.leftMargin = left
-        lp.topMargin = top
-        lp.gravity = Gravity.TOP or Gravity.START
-        web.layoutParams = lp
+        target = intArrayOf(left, top, w, h)
+        web.post { applyPlacement(0) }
+    }
+
+    private fun applyPlacement(attempt: Int) {
+        val (left, top, w, h) = target.toList()
+        val lp = (web.layoutParams as? FrameLayout.LayoutParams)
+            ?: FrameLayout.LayoutParams(w, h, Gravity.TOP or Gravity.START)
+        if (lp.width != w || lp.height != h || lp.leftMargin != left || lp.topMargin != top) {
+            lp.width = w
+            lp.height = h
+            lp.leftMargin = left
+            lp.topMargin = top
+            lp.gravity = Gravity.TOP or Gravity.START
+            web.layoutParams = lp
+        }
+        web.requestLayout()
+        (web.parent as? View)?.requestLayout()
+        if (attempt < 5) {
+            web.postDelayed({
+                if (web.width != target[2] || web.height != target[3] ||
+                    web.left != target[0] || web.top != target[1]
+                ) applyPlacement(attempt + 1)
+            }, 120)
+        }
     }
 
     fun destroy() {
@@ -308,33 +334,56 @@ fun YouTubePlayerBox(
     }
 }
 
-/** 上一首／曲名／下一首 */
+/** 曲目資訊與上一首／下一首（放在播放器下方，不會被影片蓋住） */
 @Composable
 fun YouTubeTrackBar(controller: YtController, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        TrackButton(Glyph.LEFT) { controller.previous() }
-        Spacer(Modifier.width(10.dp))
-        Text(
-            controller.errorText ?: (controller.current?.let {
-                "${controller.index + 1}/${controller.order.size}　${it.display}" +
-                    (if (controller.stateText != "播放中") "　・${controller.stateText}" else "")
-            } ?: ""),
-            color = if (controller.errorText != null) JogColors.Sun1 else JogColors.Muted,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        Spacer(Modifier.width(10.dp))
-        TrackButton(Glyph.RIGHT) { controller.next() }
+    val cur = controller.current
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
+            .background(JogColors.Surface)
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TrackButton(Glyph.LEFT, "上一首", leading = true) { controller.previous() }
+        Spacer(Modifier.width(12.dp))
+        androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+            Text(
+                if (cur != null) "第 ${controller.index + 1} / ${controller.order.size} 首・${controller.stateText}" else "",
+                color = JogColors.Sun1, style = MaterialTheme.typography.labelMedium, maxLines = 1,
+            )
+            Text(
+                controller.errorText ?: cur?.display.orEmpty(),
+                color = if (controller.errorText != null) JogColors.Sun3 else JogColors.Text,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 2, overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        TrackButton(Glyph.RIGHT, "下一首", leading = false) { controller.next() }
     }
 }
 
 @Composable
-private fun TrackButton(glyph: Glyph, onClick: () -> Unit) {
-    Box(
-        Modifier.size(40.dp).clip(CircleShape).background(JogColors.SurfaceHigh).clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) { GlyphIcon(glyph, JogColors.Text, Modifier.size(20.dp)) }
+private fun TrackButton(glyph: Glyph, label: String, leading: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .height(52.dp)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(50))
+            .background(JogColors.SurfaceHigh)
+            .border(1.dp, JogColors.Sun2.copy(alpha = 0.5f), androidx.compose.foundation.shape.RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (leading) GlyphIcon(glyph, JogColors.Sun1, Modifier.size(22.dp))
+        Text(
+            label, color = JogColors.Text, style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        if (!leading) GlyphIcon(glyph, JogColors.Sun1, Modifier.size(22.dp))
+    }
 }
 
 /** 建立並在離開畫面時釋放播放器 */
