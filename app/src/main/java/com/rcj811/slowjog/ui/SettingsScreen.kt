@@ -47,6 +47,7 @@ import com.rcj811.slowjog.AvatarStore
 import com.rcj811.slowjog.SessionStore
 import com.rcj811.slowjog.BeatSound
 import com.rcj811.slowjog.Calories
+import com.rcj811.slowjog.DailyReminder
 import com.rcj811.slowjog.Prefs
 import com.rcj811.slowjog.PreviewPlayer
 import com.rcj811.slowjog.ScreenMode
@@ -86,6 +87,40 @@ fun SettingsScreen() {
     ) {
         Spacer(Modifier.height(8.dp))
         ScreenTitle("設定")
+
+        // ---- 個人資料與目標（第一次設定的內容都可以在這裡改） ----
+        JogCard {
+            SectionLabel("個人資料")
+            Spacer(Modifier.height(8.dp))
+            BodyEditor(showShapeNote = false)
+            Spacer(Modifier.height(4.dp))
+            SwitchRow(
+                "角色依身高體重變化",
+                "開啟時陪跑角色會呈現你的高矮胖瘦",
+                s.bodyShapeOn,
+            ) { v -> Prefs.update(ctx) { it.copy(bodyShapeOn = v) } }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                String.format(
+                    Locale.US,
+                    "以 METs 估算：180 步/分 ≈ %.1f METs，%d kg 跑 30 分鐘約 %.0f 大卡。實際消耗依個人體能而異。",
+                    Calories.mets(180), s.weightKg, Calories.kcal(180, s.weightKg, 30 * 60_000L),
+                ),
+                color = JogColors.Faint, style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+
+        JogCard {
+            SectionLabel("運動目標")
+            Spacer(Modifier.height(8.dp))
+            GoalEditor()
+        }
+
+        JogCard {
+            SectionLabel("每日運動提醒")
+            Spacer(Modifier.height(4.dp))
+            DailyReminderEditor()
+        }
 
         // ---- 陪跑角色 ----
         JogCard {
@@ -204,27 +239,6 @@ fun SettingsScreen() {
             SwitchRow("震動提醒", "倒數、里程碑、完成時震動", s.vibrateOn) { v -> Prefs.update(ctx) { it.copy(vibrateOn = v) } }
         }
 
-        // ---- 個人 ----
-        JogCard {
-            SectionLabel("個人資料（計算卡路里）")
-            Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("體重", color = JogColors.Text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                RepeatButton("−", { Prefs.update(ctx) { it.copy(weightKg = it.weightKg - 1) } }, size = 40.dp)
-                Text("${s.weightKg} kg", color = JogColors.Text, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(horizontal = 14.dp))
-                RepeatButton("+", { Prefs.update(ctx) { it.copy(weightKg = it.weightKg + 1) } }, size = 40.dp)
-            }
-            Spacer(Modifier.height(10.dp))
-            Text(
-                String.format(
-                    Locale.US,
-                    "以 METs 估算：180 步/分 ≈ %.1f METs，%d kg 跑 30 分鐘約 %.0f 大卡。實際消耗依個人體能而異。",
-                    Calories.mets(180), s.weightKg, Calories.kcal(180, s.weightKg, 30 * 60_000L),
-                ),
-                color = JogColors.Faint, style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-
         // ---- 螢幕 ----
         JogCard {
             SectionLabel("畫面方向")
@@ -256,9 +270,10 @@ fun SettingsScreen() {
 }
 
 private enum class ResetKind(val title: String, val body: String, val button: String) {
-    SETTINGS("設定回到初始值", "時間、步頻、音量、聲音、角色、畫面方向等設定會恢復成剛安裝時的樣子。跑步紀錄會保留。", "恢復初始設定"),
+    SETUP("重新執行初始設定", "會重新開啟第一次使用時的設定流程（身高、體重、角色、運動目標、每日提醒），目前的設定與紀錄都會保留，可以逐步修改。", "重新設定"),
+    SETTINGS("設定回到初始值", "身高體重、時間、步頻、每日提醒、音量、聲音、角色、畫面方向等設定會恢復成剛安裝時的樣子，並重新開始初始設定流程。跑步紀錄會保留。", "恢復初始設定"),
     RECORDS("清除跑步紀錄", "所有日 / 月 / 年統計與跑步紀錄都會刪除，無法復原。設定會保留。", "清除紀錄"),
-    ALL("全部清除", "跑步紀錄、所有設定和「我的照片」都會刪除，App 回到剛安裝的狀態，無法復原。", "全部清除"),
+    ALL("全部清除", "跑步紀錄、所有設定和「我的照片」都會刪除，App 回到剛安裝的狀態並重新開始初始設定，無法復原。", "全部清除"),
 }
 
 @Composable
@@ -279,7 +294,7 @@ private fun ResetCard() {
             ) {
                 Text(
                     k.title,
-                    color = if (k == ResetKind.SETTINGS) JogColors.Text else JogColors.Sun3,
+                    color = if (k == ResetKind.SETUP || k == ResetKind.SETTINGS) JogColors.Text else JogColors.Sun3,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f),
                 )
@@ -297,6 +312,7 @@ private fun ResetCard() {
                 TextButton(onClick = {
                     PreviewPlayer.stop()
                     when (k) {
+                        ResetKind.SETUP -> Prefs.update(ctx) { it.copy(onboarded = false) }
                         ResetKind.SETTINGS -> Prefs.reset(ctx)
                         ResetKind.RECORDS -> SessionStore.clear(ctx)
                         ResetKind.ALL -> {
@@ -306,7 +322,8 @@ private fun ResetCard() {
                         }
                     }
                     confirm = null
-                    Toast.makeText(ctx, "已${k.button}", Toast.LENGTH_SHORT).show()
+                    DailyReminder.schedule(ctx)
+                    if (k != ResetKind.SETUP) Toast.makeText(ctx, "已${k.button}", Toast.LENGTH_SHORT).show()
                 }) { Text(k.button, color = JogColors.Sun3) }
             },
             dismissButton = { TextButton(onClick = { confirm = null }) { Text("取消", color = JogColors.Text) } },

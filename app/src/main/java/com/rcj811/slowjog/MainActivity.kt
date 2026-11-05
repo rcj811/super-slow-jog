@@ -42,6 +42,12 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             Prefs.settings.map { it.screenMode }.distinctUntilChanged().collect { applyOrientation(it) }
         }
+        // 每日提醒：開 App 時與設定改變時重新排程
+        lifecycleScope.launch {
+            Prefs.settings.map { Triple(it.dailyReminderOn, it.dailyHour, it.dailyMinute) }
+                .distinctUntilChanged()
+                .collect { DailyReminder.schedule(this@MainActivity) }
+        }
         setContent {
             JogTheme {
                 AppRoot(onStart = ::startRun)

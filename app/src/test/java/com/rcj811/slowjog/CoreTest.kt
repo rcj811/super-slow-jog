@@ -112,6 +112,40 @@ class CoreTest {
         assertEquals(CropCircle.minRadius(1000f, 600f), tiny.r, 0.01f)
     }
 
+    @Test fun bodyShapeFollowsHeightAndWeight() {
+        val normal = BodyShape.of(165, 60)
+        assertEquals(1f, normal.legK, 0.01f)
+        assertEquals(1f, normal.widthK, 0.03f)
+        // 越高腿越長、越矮腿越短
+        assertTrue(BodyShape.of(185, 70).legK > normal.legK)
+        assertTrue(BodyShape.of(148, 45).legK < normal.legK)
+        // BMI 越高越寬、越低越窄，且有上下限
+        assertTrue(BodyShape.of(165, 90).widthK > normal.widthK)
+        assertTrue(BodyShape.of(165, 45).widthK < normal.widthK)
+        assertEquals(1.45f, BodyShape.of(150, 200).widthK, 0.001f)
+        assertEquals(0.78f, BodyShape.of(210, 30).widthK, 0.001f)
+        assertEquals("標準", BodyShape.buildWord(165, 60))
+        assertEquals("纖瘦", BodyShape.buildWord(170, 50))
+        assertEquals("圓潤", BodyShape.buildWord(160, 80))
+        // 關閉體型變化時一律標準
+        assertEquals(BodyShape.NORMAL, BodyShape.from(Settings(heightCm = 190, weightKg = 120, bodyShapeOn = false)))
+    }
+
+    @Test fun dailyReminderNextTrigger() {
+        val now = java.time.ZonedDateTime.of(2026, 11, 5, 9, 30, 0, 0, zone)
+        // 今天還沒到 → 今天
+        val a = DailyReminder.nextTrigger(now, 19, 0)
+        assertEquals(5, a.dayOfMonth); assertEquals(19, a.hour)
+        // 已經過了 → 明天
+        val b = DailyReminder.nextTrigger(now, 7, 0)
+        assertEquals(6, b.dayOfMonth); assertEquals(7, b.hour)
+        // 剛好同一分鐘也排明天，避免重複
+        val c = DailyReminder.nextTrigger(now, 9, 30)
+        assertEquals(6, c.dayOfMonth)
+        assertEquals("晚上 19:00", DailyReminder.timeText(19, 0))
+        assertEquals("早上 07:05", DailyReminder.timeText(7, 5))
+    }
+
     @Test fun mascotIds() {
         assertEquals(Mascot.CAPYBARA, Mascot.fromId("CAPYBARA"))
         assertEquals(Mascot.DUCK, Mascot.fromId("unknown"))

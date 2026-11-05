@@ -146,7 +146,7 @@ fun MascotPicker(modifier: Modifier = Modifier, columns: Int = 3) {
             }
         }
         Text(
-            "「我的照片」選好照片後，可以拖曳圓圈選擇要當頭像的位置、兩指縮放大小（寵物照也可以）。照片只存在這支手機裡。",
+            "角色會依你的身高、體重呈現高矮胖瘦（可在設定關閉）。「我的照片」選好照片後，可以拖曳圓圈選擇頭像位置、兩指縮放大小（寵物照也可以），照片只存在這支手機裡。",
             color = JogColors.Faint, style = MaterialTheme.typography.bodyMedium,
         )
     }
@@ -186,6 +186,12 @@ fun MascotHero(cadence: Int, previewing: Boolean, modifier: Modifier = Modifier)
         Column(Modifier.weight(1f)) {
             Text("${s.mascot.label}陪你跑", color = JogColors.Text, style = MaterialTheme.typography.titleMedium)
             Text("原地小步跑・$cadence 步/分", color = JogColors.Muted, style = MaterialTheme.typography.bodyMedium)
+            if (s.bodyShapeOn) {
+                Text(
+                    "依你的身高體重：${com.rcj811.slowjog.BodyShape.heightWord(s.heightCm)}・${com.rcj811.slowjog.BodyShape.buildWord(s.heightCm, s.weightKg)}",
+                    color = JogColors.Faint, style = MaterialTheme.typography.labelMedium,
+                )
+            }
             Spacer(Modifier.height(8.dp))
             Text(
                 "換角色 ›", color = JogColors.Sun1, style = MaterialTheme.typography.labelLarge,

@@ -36,22 +36,34 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rcj811.slowjog.Phase
+import com.rcj811.slowjog.Prefs
 import com.rcj811.slowjog.RunRepository
 
 @Composable
 fun AppRoot(onStart: () -> Unit) {
     val run by RunRepository.state.collectAsStateWithLifecycle()
+    val settings by Prefs.settings.collectAsStateWithLifecycle()
     val inRun = run.phase != Phase.IDLE
+    // 0 = 主畫面、1 = 第一次設定、2 = 跑步中
+    val screen = when {
+        inRun -> 2
+        !settings.onboarded -> 1
+        else -> 0
+    }
 
     AnimatedContent(
-        targetState = inRun,
+        targetState = screen,
         transitionSpec = {
             (fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 12 }) togetherWith fadeOut(tween(250))
         },
         label = "root",
         modifier = Modifier.fillMaxSize().background(JogColors.Bg),
-    ) { running ->
-        if (running) RunScreen(RunRepository.state.collectAsStateWithLifecycle().value) else Tabs(onStart)
+    ) { target ->
+        when (target) {
+            2 -> RunScreen(RunRepository.state.collectAsStateWithLifecycle().value)
+            1 -> OnboardingScreen()
+            else -> Tabs(onStart)
+        }
     }
 }
 

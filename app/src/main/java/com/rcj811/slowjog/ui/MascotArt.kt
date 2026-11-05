@@ -30,7 +30,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rcj811.slowjog.AvatarStore
+import com.rcj811.slowjog.BodyShape
 import com.rcj811.slowjog.Mascot
+import com.rcj811.slowjog.Prefs
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.exp
@@ -104,8 +106,11 @@ fun MascotView(
     cadence: Int = 180,
     celebrate: Boolean = false,
     phaseSource: (() -> Double?)? = null,
+    shape: BodyShape? = null,
 ) {
     val avatar by AvatarStore.image.collectAsStateWithLifecycle()
+    val settings by Prefs.settings.collectAsStateWithLifecycle()
+    val bodyShape = shape ?: BodyShape.from(settings)
     var t by remember { mutableFloatStateOf(0f) }
     var localPhase by remember { mutableDoubleStateOf(0.0) }
     val cad by rememberUpdatedState(cadence)
@@ -124,7 +129,7 @@ fun MascotView(
     Canvas(modifier) {
         val time = t
         val ph = phaseSource?.invoke() ?: localPhase
-        drawMascot(mascot, jogPose(ph, moving, time, celebrate), time, avatar)
+        drawMascot(mascot, jogPose(ph, moving, time, celebrate), time, avatar, bodyShape)
     }
 }
 
@@ -138,19 +143,58 @@ private val BLUSH = Color(0xFFFF7A8A).copy(alpha = 0.45f)
 private val MOUTH = Color(0xFF8A2E3B)
 private val TONGUE = Color(0xFFFF8FA3)
 
-private class Pen(val ds: DrawScope, val u: Float, val ox: Float, val oy: Float) {
-    fun o(x: Float, y: Float) = Offset(ox + x * u, oy + y * u)
+private fun smooth(e0: Float, e1: Float, x: Float): Float {
+    val t = ((x - e0) / (e1 - e0)).coerceIn(0f, 1f)
+    return t * t * (3f - 2f * t)
+}
 
-    fun circle(col: Color, x: Float, y: Float, r: Float) = ds.drawCircle(col, r * u, o(x, y))
+/**
+ * 畫筆：在 100×100 的虛擬座標上作畫，並依 [shape] 套用體型。
+ * - 腿（y ≥ 70）依身高拉長或縮短，上半身跟著上下移
+ * - 寬度依 y 分區：頭部、身體、腿部各自放寬或縮窄
+ */
+private class Pen(val ds: DrawScope, val u: Float, val ox: Float, val oy: Float, val shape: BodyShape) {
+    private val legK = shape.legK
+    private val headW = shape.headK
+    private val bodyW = shape.widthK
+    private val legW = shape.legSpread
+    private val limbK = shape.limbK
 
-    fun oval(col: Color, cx: Float, cy: Float, rx: Float, ry: Float) =
-        ds.drawOval(col, o(cx - rx, cy - ry), Size(2 * rx * u, 2 * ry * u))
+    fun sx(y: Float): Float {
+        val a = headW + (bodyW - headW) * smooth(44f, 56f, y)
+        return a + (legW - a) * smooth(74f, 82f, y)
+    }
+
+    fun my(y: Float): Float = if (y >= 70f) GROUND - (GROUND - y) * legK else y + 23f * (1f - legK)
+
+    fun o(x: Float, y: Float): Offset {
+        val k = sx(y)
+        return Offset(ox + (50f + (x - 50f) * k) * u, oy + my(y) * u)
+    }
+
+    /** 四肢（較粗的線）跟著體型變粗變細；五官等細線不變 */
+    fun lw(w: Float) = if (w >= 2.4f) w * limbK else w
+
+    fun circle(col: Color, x: Float, y: Float, r: Float) = oval(col, x, y, r, r)
+
+    fun oval(col: Color, cx: Float, cy: Float, rx: Float, ry: Float) {
+        val c = o(cx, cy)
+        val k = sx(cy)
+        ds.drawOval(col, Offset(c.x - rx * k * u, c.y - ry * u), Size(2 * rx * k * u, 2 * ry * u))
+    }
 
     fun line(col: Color, x1: Float, y1: Float, x2: Float, y2: Float, w: Float) =
-        ds.drawLine(col, o(x1, y1), o(x2, y2), strokeWidth = w * u, cap = StrokeCap.Round)
+        ds.drawLine(col, o(x1, y1), o(x2, y2), strokeWidth = lw(w) * u, cap = StrokeCap.Round)
 
-    fun rrect(col: Color, x: Float, y: Float, w: Float, h: Float, r: Float) =
-        ds.drawRoundRect(col, o(x, y), Size(w * u, h * u), CornerRadius(r * u))
+    fun rrect(col: Color, x: Float, y: Float, w: Float, h: Float, r: Float) {
+        val k = sx(y + h / 2f)
+        val left = ox + (50f + (x - 50f) * k) * u
+        val right = ox + (50f + (x + w - 50f) * k) * u
+        val top = oy + my(y) * u
+        val bottom = oy + my(y + h) * u
+        val rr = minOf(r * u, (right - left) / 2f, (bottom - top) / 2f)
+        ds.drawRoundRect(col, Offset(left, top), Size(right - left, bottom - top), CornerRadius(rr))
+    }
 
     inner class PB(val path: Path) {
         fun m(x: Float, y: Float) { val p = o(x, y); path.moveTo(p.x, p.y) }
@@ -168,13 +212,16 @@ private class Pen(val ds: DrawScope, val u: Float, val ox: Float, val oy: Float)
 
     fun stroke(col: Color, w: Float, build: PB.() -> Unit) {
         val p = Path(); PB(p).build()
-        ds.drawPath(p, col, style = Stroke(w * u, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        ds.drawPath(p, col, style = Stroke(lw(w) * u, cap = StrokeCap.Round, join = StrokeJoin.Round))
     }
 
     /** 與 Compose drawArc 相同：角度、0° = 三點鐘方向、順時針 */
-    fun arc(col: Color, cx: Float, cy: Float, rx: Float, ry: Float, start: Float, sweep: Float, w: Float) =
-        ds.drawArc(col, start, sweep, false, o(cx - rx, cy - ry), Size(2 * rx * u, 2 * ry * u),
+    fun arc(col: Color, cx: Float, cy: Float, rx: Float, ry: Float, start: Float, sweep: Float, w: Float) {
+        val c = o(cx, cy)
+        val k = sx(cy)
+        ds.drawArc(col, start, sweep, false, Offset(c.x - rx * k * u, c.y - ry * u), Size(2 * rx * k * u, 2 * ry * u),
             style = Stroke(w * u, cap = StrokeCap.Round))
+    }
 
     fun rotated(deg: Float, px: Float, py: Float, block: () -> Unit) {
         ds.rotate(deg, o(px, py)) { block() }
@@ -269,9 +316,9 @@ private fun Pen.ball(col: Color, r: Float): (Float, Float) -> Unit = { x, y -> c
 
 // ---------------- 入口 ----------------
 
-fun DrawScope.drawMascot(mascot: Mascot, ps: JogPose, t: Float, avatar: ImageBitmap?) {
+fun DrawScope.drawMascot(mascot: Mascot, ps: JogPose, t: Float, avatar: ImageBitmap?, shape: BodyShape = BodyShape.NORMAL) {
     val u = size.minDimension / 100f
-    val p = Pen(this, u, (size.width - 100f * u) / 2f, (size.height - 100f * u) / 2f)
+    val p = Pen(this, u, (size.width - 100f * u) / 2f, (size.height - 100f * u) / 2f, shape)
     val sq = ps.squash
     withTransform({ scale(1f + 0.05f * sq, 1f - 0.06f * sq, pivot = p.o(50f, GROUND)) }) {
         when (mascot) {
@@ -558,9 +605,9 @@ private fun Pen.photoBody(ps: JogPose) {
 /** 自訂照片角色的頭：固定位置，不隨節拍移動 */
 private fun Pen.photoHead(avatar: ImageBitmap?) {
     val hy = 29f
-    circle(WHITE, 50f, hy, 20.5f)
+    val c = o(50f, hy)
+    ds.drawCircle(WHITE, 20.5f * u, c)
     if (avatar != null) {
-        val c = o(50f, hy)
         val r = 19f * u
         val clip = Path().apply { addOval(Rect(c, r)) }
         ds.clipPath(clip) {
@@ -574,7 +621,7 @@ private fun Pen.photoHead(avatar: ImageBitmap?) {
             )
         }
     } else {
-        circle(Color(0xFF27221E), 50f, hy, 19f)
+        ds.drawCircle(Color(0xFF27221E), 19f * u, c)
         val plus = Color(0xFFA59B92)
         line(plus, 50f, hy - 6f, 50f, hy + 6f, 2.2f)
         line(plus, 44f, hy, 56f, hy, 2.2f)
