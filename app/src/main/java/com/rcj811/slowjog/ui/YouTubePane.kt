@@ -5,8 +5,11 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.view.ViewGroup
+import android.graphics.Bitmap
+import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
@@ -54,6 +57,11 @@ class YtController(context: Context, items: List<YtItem>, shuffle: Boolean) {
     private var wantPlay = false
     private var volume = 60
     private var consecutiveErrors = 0
+    private var lastConsoleError: String? = null
+
+    /** 播放器狀態文字 */
+    var stateText by mutableStateOf("載入中…")
+        private set
 
     @SuppressLint("SetJavaScriptEnabled")
     val web: WebView = WebView(context).apply {
@@ -61,23 +69,58 @@ class YtController(context: Context, items: List<YtItem>, shuffle: Boolean) {
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.mediaPlaybackRequiresUserGesture = false
-        webChromeClient = WebChromeClient()
+        settings.cacheMode = WebSettings.LOAD_DEFAULT
+        webChromeClient = object : WebChromeClient() {
+            // 沒有封面時用黑色小圖，避免出現灰色播放圖示
+            override fun getDefaultVideoPoster(): Bitmap? =
+                super.getDefaultVideoPoster() ?: Bitmap.createBitmap(1, 1, Bitmap.Config.RGB_565)
+
+            override fun onConsoleMessage(m: ConsoleMessage): Boolean {
+                if (m.messageLevel() == ConsoleMessage.MessageLevel.ERROR) lastConsoleError = m.message()
+                return true
+            }
+        }
         webViewClient = WebViewClient()
         addJavascriptInterface(Bridge(), "Android")
-        loadDataWithBaseURL(ORIGIN + "/", HTML, "text/html", "utf-8", null)
+        val firstId = order.firstOrNull()?.id ?: ""
+        loadDataWithBaseURL(ORIGIN, HTML.replace("__VIDEO_ID__", firstId), "text/html", "utf-8", null)
+        // 15 秒內播放器沒準備好就顯示原因
+        main.postDelayed({
+            if (!ready) {
+                errorText = "YouTube 播放器載入失敗，請確認網路連線" +
+                    (lastConsoleError?.let { "（$it）" } ?: "")
+            }
+        }, 15_000)
     }
+
+
 
     val current: YtItem? get() = order.getOrNull(index)
 
     private inner class Bridge {
         @JavascriptInterface fun onReady() = main.post {
             ready = true
+            errorText = null
+            stateText = "已就緒"
             js("vol($volume)")
-            loadCurrent()
+            if (index == 0) {
+                if (wantPlay) js("play()")
+            } else {
+                loadCurrent()
+            }
             Unit
         }
 
         @JavascriptInterface fun onState(state: Int) = main.post {
+            stateText = when (state) {
+                -1 -> "準備中…"
+                0 -> "播放完畢"
+                1 -> "播放中"
+                2 -> "已暫停"
+                3 -> "緩衝中…"
+                5 -> "已載入"
+                else -> stateText
+            }
             if (state == 0) next() // 播完 → 下一首
             if (state == 1) {
                 consecutiveErrors = 0
@@ -149,18 +192,19 @@ class YtController(context: Context, items: List<YtItem>, shuffle: Boolean) {
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <style>html,body{margin:0;padding:0;background:#000;height:100%;overflow:hidden}#p{position:absolute;top:0;left:0;width:100%;height:100%}</style>
 </head><body><div id="p"></div>
+<script src="https://www.youtube.com/iframe_api" defer></script>
 <script>
 var player=null, ready=false;
-var tag=document.createElement('script'); tag.src='https://www.youtube.com/iframe_api';
-document.head.appendChild(tag);
 function onYouTubeIframeAPIReady(){
-  player=new YT.Player('p',{width:'100%',height:'100%',
-    playerVars:{playsinline:1,controls:1,rel:0,fs:0,origin:'$ORIGIN',widget_referrer:'$ORIGIN'},
+  var cfg={width:'100%',height:'100%',
+    playerVars:{playsinline:1,controls:1,rel:0,fs:0,enablejsapi:1,iv_load_policy:3,origin:'$ORIGIN'},
     events:{
       onReady:function(){ready=true;Android.onReady();},
       onStateChange:function(e){Android.onState(e.data);},
       onError:function(e){Android.onError(e.data);}
-    }});
+    }};
+  if('__VIDEO_ID__'){cfg.videoId='__VIDEO_ID__';}
+  player=new YT.Player('p',cfg);
 }
 function loadV(id,auto){ if(!ready)return; if(auto){player.loadVideoById(id);}else{player.cueVideoById(id);} }
 function play(){ if(ready)player.playVideo(); }
@@ -176,7 +220,8 @@ function vol(v){ if(!ready)return; player.setVolume(v); if(v>0){player.unMute();
 fun YouTubePlayerBox(controller: YtController, playing: Boolean, volume: Int, modifier: Modifier = Modifier) {
     LaunchedEffect(playing, controller.ready) { controller.setPlaying(playing) }
     LaunchedEffect(volume, controller.ready) { controller.setVolume(volume) }
-    Box(modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).background(androidx.compose.ui.graphics.Color.Black)) {
+    // 注意：不要對 WebView 外層做圓角裁切，否則影片可能只剩黑畫面（有聲音沒影像）
+    Box(modifier.background(androidx.compose.ui.graphics.Color.Black)) {
         AndroidView(
             factory = {
                 (controller.web.parent as? ViewGroup)?.removeView(controller.web)
@@ -194,7 +239,10 @@ fun YouTubeTrackBar(controller: YtController, modifier: Modifier = Modifier) {
         TrackButton(Glyph.LEFT) { controller.previous() }
         Spacer(Modifier.width(10.dp))
         Text(
-            controller.errorText ?: (controller.current?.let { "${controller.index + 1}/${controller.order.size}　${it.display}" } ?: ""),
+            controller.errorText ?: (controller.current?.let {
+                "${controller.index + 1}/${controller.order.size}　${it.display}" +
+                    (if (controller.stateText != "播放中") "　・${controller.stateText}" else "")
+            } ?: ""),
             color = if (controller.errorText != null) JogColors.Sun1 else JogColors.Muted,
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
