@@ -75,7 +75,7 @@ class YtController(context: Context, items: List<YtItem>, shuffle: Boolean) {
         private set
 
     @SuppressLint("SetJavaScriptEnabled")
-    val web: WebView = WebView(context).apply {
+    val web: WebView = BackgroundWebView(context).apply {
         setBackgroundColor(android.graphics.Color.BLACK)
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
@@ -383,6 +383,17 @@ private fun TrackButton(glyph: Glyph, label: String, leading: Boolean, onClick: 
             modifier = Modifier.padding(horizontal = 4.dp),
         )
         if (!leading) GlyphIcon(glyph, JogColors.Sun1, Modifier.size(22.dp))
+    }
+}
+
+/**
+ * 最小化或關螢幕時不讓 WebView 知道自己被隱藏，YouTube 就會繼續播放聲音。
+ * App 程序由跑步的前景服務保持存活。
+ */
+class BackgroundWebView(context: Context) : WebView(context) {
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        if (visibility != View.VISIBLE && com.rcj811.slowjog.Prefs.settings.value.ytBackground) return
+        super.onWindowVisibilityChanged(visibility)
     }
 }
 

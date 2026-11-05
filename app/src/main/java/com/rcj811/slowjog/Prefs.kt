@@ -32,6 +32,8 @@ data class Settings(
     val ytOn: Boolean = false,
     val ytVolume: Int = 60,
     val ytShuffle: Boolean = false,
+    /** App 最小化或關螢幕時 YouTube 繼續播放（自用） */
+    val ytBackground: Boolean = true,
     /** 節拍音量 0–1.5（超過 100% 以柔和限幅放大） */
     val volume: Float = 0.8f,
     /** 語音提醒音量 0–1 */
@@ -102,6 +104,7 @@ object Prefs {
             ytOn = p.getBoolean("ytOn", d.ytOn),
             ytVolume = p.getInt("ytVolume", d.ytVolume).coerceIn(0, 100),
             ytShuffle = p.getBoolean("ytShuffle", d.ytShuffle),
+            ytBackground = p.getBoolean("ytBackground", d.ytBackground),
             volume = p.getFloat("volume", d.volume).coerceIn(0f, Settings.MAX_BEAT_VOLUME),
             voiceVolume = p.getFloat("voiceVolume", d.voiceVolume).coerceIn(0f, 1f),
             beatSound = BeatSound.fromId(p.getString("beatSound", d.beatSound.name)),
@@ -151,6 +154,7 @@ object Prefs {
             .putBoolean("ytOn", s.ytOn)
             .putInt("ytVolume", s.ytVolume)
             .putBoolean("ytShuffle", s.ytShuffle)
+            .putBoolean("ytBackground", s.ytBackground)
             .putFloat("volume", s.volume)
             .putFloat("voiceVolume", s.voiceVolume)
             .putString("beatSound", s.beatSound.name)

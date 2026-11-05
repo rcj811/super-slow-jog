@@ -102,6 +102,9 @@ fun YouTubeSettingsCard() {
             else Prefs.update(ctx) { it.copy(ytOn = v) }
         }
         SwitchRow("隨機播放", "每次開始跑步時打亂順序", s.ytShuffle) { v -> Prefs.update(ctx) { it.copy(ytShuffle = v) } }
+        SwitchRow("最小化或關螢幕時繼續播放", "切到其他 App 或關掉螢幕，YouTube 聲音不中斷（跑步中有效）", s.ytBackground) { v ->
+            Prefs.update(ctx) { it.copy(ytBackground = v) }
+        }
         Spacer(Modifier.height(4.dp))
         YouTubeVolumeSlider()
         Text(
@@ -177,7 +180,7 @@ fun YouTubeSettingsCard() {
         }
         Spacer(Modifier.height(6.dp))
         Text(
-            "使用 YouTube 官方嵌入播放器，需要網路；有些影片不允許在其他 App 播放，會自動跳到下一首。播放時請保持螢幕開啟。",
+            "使用 YouTube 官方嵌入播放器，需要網路；有些影片不允許在其他 App 播放，會自動跳到下一首。",
             color = JogColors.Faint, style = MaterialTheme.typography.bodyMedium,
         )
     }
