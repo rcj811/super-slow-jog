@@ -1,10 +1,15 @@
 package com.rcj811.slowjog.ui
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.os.Handler
 import android.os.Looper
+import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.graphics.Bitmap
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
@@ -35,11 +40,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.rcj811.slowjog.YtItem
+import kotlin.math.roundToInt
 
 /**
  * YouTube 官方嵌入式播放器（IFrame Player API）包在 WebView 裡。
@@ -215,20 +223,77 @@ function vol(v){ if(!ready)return; player.setVolume(v); if(v>0){player.unMute();
     }
 }
 
-/** 跑步畫面裡的 YouTube 播放器（WebView 由外部保存，旋轉螢幕不會重新載入） */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+/**
+ * 跑步畫面裡的 YouTube 播放器。
+ *
+ * WebView 不放在 Compose 畫面裡繪製（在 Compose 裡 WebView 影片會變成黑畫面、甚至蓋住旁邊的文字），
+ * 而是加到 Activity 的最上層，位置與大小對齊這個 Box。旋轉螢幕時跟著移動，不會重新載入。
+ * [hidden] 為 true（例如倒數中）時暫時隱藏，讓 Compose 的內容顯示出來。
+ */
 @Composable
-fun YouTubePlayerBox(controller: YtController, playing: Boolean, volume: Int, modifier: Modifier = Modifier) {
+fun YouTubePlayerBox(
+    controller: YtController,
+    playing: Boolean,
+    volume: Int,
+    modifier: Modifier = Modifier,
+    hidden: Boolean = false,
+) {
     LaunchedEffect(playing, controller.ready) { controller.setPlaying(playing) }
     LaunchedEffect(volume, controller.ready) { controller.setVolume(volume) }
-    // 注意：不要對 WebView 外層做圓角裁切，否則影片可能只剩黑畫面（有聲音沒影像）
-    Box(modifier.background(androidx.compose.ui.graphics.Color.Black)) {
-        AndroidView(
-            factory = {
-                (controller.web.parent as? ViewGroup)?.removeView(controller.web)
-                controller.web
+
+    val context = LocalContext.current
+    val root = remember(context) { context.findActivity()?.findViewById<FrameLayout>(android.R.id.content) }
+    val web = controller.web
+
+    DisposableEffect(root, web) {
+        if (root != null) {
+            (web.parent as? ViewGroup)?.removeView(web)
+            root.addView(web, FrameLayout.LayoutParams(1, 1, Gravity.TOP or Gravity.START))
+        }
+        onDispose { (web.parent as? ViewGroup)?.removeView(web) }
+    }
+    LaunchedEffect(hidden) { web.visibility = if (hidden) View.INVISIBLE else View.VISIBLE }
+
+    Box(
+        modifier
+            .background(androidx.compose.ui.graphics.Color.Black)
+            .onGloballyPositioned { coords ->
+                if (root == null) return@onGloballyPositioned
+                val pos = coords.positionInWindow()
+                val loc = IntArray(2)
+                root.getLocationInWindow(loc)
+                val w = coords.size.width.coerceAtLeast(1)
+                val h = coords.size.height.coerceAtLeast(1)
+                val left = pos.x.roundToInt() - loc[0]
+                val top = pos.y.roundToInt() - loc[1]
+                val lp = (web.layoutParams as? FrameLayout.LayoutParams)
+                    ?: FrameLayout.LayoutParams(w, h, Gravity.TOP or Gravity.START)
+                if (lp.width != w || lp.height != h || lp.leftMargin != left || lp.topMargin != top) {
+                    lp.width = w
+                    lp.height = h
+                    lp.leftMargin = left
+                    lp.topMargin = top
+                    lp.gravity = Gravity.TOP or Gravity.START
+                    web.layoutParams = lp
+                }
             },
-            modifier = Modifier.fillMaxSize(),
-        )
+    ) {
+        if (root == null) {
+            // 找不到 Activity 時退回在 Compose 內顯示
+            AndroidView(
+                factory = {
+                    (web.parent as? ViewGroup)?.removeView(web)
+                    web
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 

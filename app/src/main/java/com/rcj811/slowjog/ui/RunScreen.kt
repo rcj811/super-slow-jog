@@ -326,7 +326,11 @@ private fun YtArea(run: RunState, s: Settings, yt: YtController, modifier: Modif
                 .aspectRatio(16f / 9f),
             contentAlignment = Alignment.Center,
         ) {
-            YouTubePlayerBox(yt, playing = run.phase == Phase.RUNNING, volume = s.ytVolume, modifier = Modifier.fillMaxSize())
+            YouTubePlayerBox(
+                yt, playing = run.phase == Phase.RUNNING, volume = s.ytVolume,
+                modifier = Modifier.fillMaxSize(),
+                hidden = run.phase == Phase.COUNTDOWN,
+            )
             if (run.phase == Phase.COUNTDOWN) {
                 Box(
                     Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp)).background(Color.Black.copy(alpha = 0.78f)),
