@@ -173,6 +173,14 @@ class CoreTest {
         assertEquals(Settings.FIRST_VOICE, d.voiceName)
     }
 
+    @Test fun unifiedVolume() {
+        val u = Settings(volume = 0.5f, voiceVolume = 0.3f, ytVolume = 20, unifiedVolume = true)
+        assertEquals(1f, u.beatVol, 0f); assertEquals(1f, u.voiceVol, 0f); assertEquals(100, u.ytVol)
+        val sep = u.copy(unifiedVolume = false)
+        assertEquals(0.5f, sep.beatVol, 0f); assertEquals(0.3f, sep.voiceVol, 0f); assertEquals(20, sep.ytVol)
+        assertTrue(Settings().unifiedVolume)
+    }
+
     @Test fun mascotIds() {
         assertEquals(Mascot.CAPYBARA, Mascot.fromId("CAPYBARA"))
         assertEquals(Mascot.DUCK, Mascot.fromId("unknown"))

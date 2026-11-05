@@ -31,6 +31,8 @@ data class Settings(
     /** 跑步時播放 YouTube（取代角色區） */
     val ytOn: Boolean = false,
     val ytVolume: Int = 60,
+    /** 統一音量：節拍、語音、YouTube 一樣大，只用裝置音量調整 */
+    val unifiedVolume: Boolean = true,
     val ytShuffle: Boolean = false,
     /** App 最小化或關螢幕時 YouTube 繼續播放（自用） */
     val ytBackground: Boolean = true,
@@ -51,6 +53,11 @@ data class Settings(
     val screenMode: ScreenMode = ScreenMode.AUTO,
     val mascot: Mascot = Mascot.DUCK,
 ) {
+    /** 實際使用的音量（統一音量時全部 100%，只由裝置音量決定） */
+    val beatVol: Float get() = if (unifiedVolume) 1f else volume
+    val voiceVol: Float get() = if (unifiedVolume) 1f else voiceVolume
+    val ytVol: Int get() = if (unifiedVolume) 100 else ytVolume
+
     companion object {
         const val MIN_DURATION = 10
         const val MAX_DURATION = 120
@@ -103,6 +110,7 @@ object Prefs {
             dailyMinute = p.getInt("dailyMinute", d.dailyMinute).coerceIn(0, 59),
             ytOn = p.getBoolean("ytOn", d.ytOn),
             ytVolume = p.getInt("ytVolume", d.ytVolume).coerceIn(0, 100),
+            unifiedVolume = p.getBoolean("unifiedVolume", d.unifiedVolume),
             ytShuffle = p.getBoolean("ytShuffle", d.ytShuffle),
             ytBackground = p.getBoolean("ytBackground", d.ytBackground),
             volume = p.getFloat("volume", d.volume).coerceIn(0f, Settings.MAX_BEAT_VOLUME),
@@ -153,6 +161,7 @@ object Prefs {
             .putInt("dailyMinute", s.dailyMinute)
             .putBoolean("ytOn", s.ytOn)
             .putInt("ytVolume", s.ytVolume)
+            .putBoolean("unifiedVolume", s.unifiedVolume)
             .putBoolean("ytShuffle", s.ytShuffle)
             .putBoolean("ytBackground", s.ytBackground)
             .putFloat("volume", s.volume)

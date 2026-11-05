@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -48,15 +49,24 @@ private fun volumeSliderColors(boost: Boolean = false) = SliderDefaults.colors(
 )
 
 /**
- * 音量控制：節拍音量（0–150%）、語音音量（0–100%）、手機媒體音量。
- * App 自己的音量是相對於手機媒體音量的比例；手機音量太小時可在這裡一併調大。
+ * 音量控制：統一音量開關、節拍音量（0–150%）、語音音量（0–100%）、裝置音量。
+ * 統一音量開啟時，所有聲音一樣大，只由裝置音量控制，其他滑桿變灰停用。
  */
 @Composable
 fun VolumeControls(onBeatTest: (() -> Unit)?, onVoiceTest: (() -> Unit)?) {
     val ctx = LocalContext.current
     val s by Prefs.settings.collectAsStateWithLifecycle()
 
+    val locked = s.unifiedVolume
     Column {
+        SwitchRow(
+            "統一音量",
+            "節拍、語音、YouTube 一樣大聲，只用下方「裝置音量」（或手機音量鍵）調整",
+            locked,
+        ) { v -> Prefs.update(ctx) { it.copy(unifiedVolume = v) }; PreviewPlayer.update(Prefs.settings.value) }
+        Spacer(Modifier.height(8.dp))
+        // 節拍、語音（統一音量時反白停用）
+        Column(Modifier.alpha(if (locked) 0.35f else 1f)) {
         // 節拍
         Row(verticalAlignment = Alignment.CenterVertically) {
             GlyphIcon(Glyph.SOUND, JogColors.Sun1, Modifier.size(20.dp))
@@ -70,6 +80,7 @@ fun VolumeControls(onBeatTest: (() -> Unit)?, onVoiceTest: (() -> Unit)?) {
         }
         Slider(
             value = s.volume,
+            enabled = !locked,
             onValueChange = { v ->
                 val snapped = Math.round(v * 20) / 20f // 5% 一格
                 Prefs.update(ctx) { it.copy(volume = snapped) }
@@ -81,7 +92,7 @@ fun VolumeControls(onBeatTest: (() -> Unit)?, onVoiceTest: (() -> Unit)?) {
         )
         Row {
             listOf(0.5f, 0.8f, 1.0f, 1.3f, 1.5f).forEach { v ->
-                QuickPill(pct(v), selected = kotlin.math.abs(s.volume - v) < 0.01f) {
+                QuickPill(pct(v), selected = !locked && kotlin.math.abs(s.volume - v) < 0.01f, enabled = !locked) {
                     Prefs.update(ctx) { it.copy(volume = v) }
                     PreviewPlayer.update(Prefs.settings.value)
                     onBeatTest?.invoke()
@@ -99,6 +110,7 @@ fun VolumeControls(onBeatTest: (() -> Unit)?, onVoiceTest: (() -> Unit)?) {
         }
         Slider(
             value = s.voiceVolume,
+            enabled = !locked,
             onValueChange = { v -> Prefs.update(ctx) { it.copy(voiceVolume = Math.round(v * 20) / 20f) } },
             onValueChangeFinished = { onVoiceTest?.invoke() },
             valueRange = 0f..1f,
@@ -109,17 +121,19 @@ fun VolumeControls(onBeatTest: (() -> Unit)?, onVoiceTest: (() -> Unit)?) {
             Spacer(Modifier.height(14.dp))
             YouTubeVolumeSlider()
         }
+        }
 
         Spacer(Modifier.height(14.dp))
         PhoneMediaVolume()
         Text(
-            "App 音量是手機「媒體音量」的比例。節拍超過 100% 會加強但不破音；若還是太小聲，請調大手機媒體音量（也會影響音樂）。",
+            if (locked) "統一音量開啟中：所有聲音都由「裝置音量」控制，上方的個別音量已停用。"
+            else "個別音量是「裝置音量」的比例。節拍超過 100% 會加強但不破音；若還是太小聲，請調大裝置音量（也會影響音樂）。",
             color = JogColors.Faint, style = MaterialTheme.typography.bodyMedium,
         )
     }
 }
 
-/** 直接調整手機媒體音量，並跟著實體音量鍵同步 */
+/** 直接調整裝置（媒體）音量，並跟著實體音量鍵同步 */
 @Composable
 fun PhoneMediaVolume() {
     val ctx = LocalContext.current
@@ -136,7 +150,7 @@ fun PhoneMediaVolume() {
         Row(verticalAlignment = Alignment.CenterVertically) {
             GlyphIcon(Glyph.PHONE, JogColors.Muted, Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
-            Text("手機媒體音量", color = JogColors.Text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Text("裝置音量", color = JogColors.Text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
             Text("$cur / $max", color = JogColors.Muted, style = MaterialTheme.typography.labelLarge)
         }
         Slider(
@@ -160,7 +174,7 @@ fun PhoneMediaVolume() {
 }
 
 @Composable
-private fun QuickPill(text: String, selected: Boolean, onClick: () -> Unit) {
+private fun QuickPill(text: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
     Text(
         text,
         color = if (selected) JogColors.Sun1 else JogColors.Muted,
@@ -168,7 +182,7 @@ private fun QuickPill(text: String, selected: Boolean, onClick: () -> Unit) {
         modifier = Modifier
             .clip(RoundedCornerShape(50))
             .background(if (selected) JogColors.Sun2.copy(alpha = 0.18f) else JogColors.SurfaceHigh)
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp),
     )
 }

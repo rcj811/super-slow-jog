@@ -87,7 +87,7 @@ class JogService : Service() {
         startWallMs = System.currentTimeMillis()
 
         val m = Metronome().apply {
-            bpm = s.cadence; volume = s.volume; sound = s.beatSound; alternate = s.alternateTone
+            bpm = s.cadence; volume = s.beatVol; sound = s.beatSound; alternate = s.alternateTone
         }
         metronome?.stop()
         metronome = m
@@ -295,7 +295,7 @@ class JogService : Service() {
         settingsJob = scope.launch {
             Prefs.settings.collect { s ->
                 metronome?.let {
-                    it.volume = s.volume
+                    it.volume = s.beatVol
                     it.alternate = s.alternateTone
                     if (it.sound != s.beatSound) {
                         launch(Dispatchers.Default) {

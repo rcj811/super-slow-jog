@@ -264,7 +264,7 @@ private fun RunHeader(run: RunState, s: Settings) {
         ) {
             GlyphIcon(Glyph.SOUND, JogColors.Sun1, Modifier.size(18.dp))
             Spacer(Modifier.width(4.dp))
-            Text("${Math.round(s.volume * 100)}%", color = JogColors.Sun1, style = MaterialTheme.typography.labelMedium)
+            Text(if (s.unifiedVolume) "音量" else "${Math.round(s.volume * 100)}%", color = JogColors.Sun1, style = MaterialTheme.typography.labelMedium)
         }
     }
     if (showVolume) {
@@ -327,7 +327,7 @@ private fun YtArea(run: RunState, s: Settings, yt: YtController, modifier: Modif
             contentAlignment = Alignment.Center,
         ) {
             YouTubePlayerBox(
-                yt, playing = run.phase == Phase.RUNNING, volume = s.ytVolume,
+                yt, playing = run.phase == Phase.RUNNING, volume = s.ytVol,
                 modifier = Modifier.fillMaxSize(),
                 hidden = run.phase == Phase.COUNTDOWN,
             )

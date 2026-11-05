@@ -70,7 +70,7 @@ fun SetupScreen(onStart: () -> Unit) {
     val streak = remember(sessions) { Stats.streak(sessions, today) }
 
     DisposableEffect(Unit) { onDispose { PreviewPlayer.stop() } }
-    LaunchedEffect(s.cadence, s.volume, s.alternateTone) { PreviewPlayer.update(s) }
+    LaunchedEffect(s.cadence, s.beatVol, s.alternateTone) { PreviewPlayer.update(s) }
 
     val breathe = rememberInfiniteTransition(label = "breathe")
     val scale by breathe.animateFloat(1f, 1.03f, infiniteRepeatable(tween(1400), RepeatMode.Reverse), label = "scale")

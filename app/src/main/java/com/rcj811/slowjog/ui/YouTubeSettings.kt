@@ -53,10 +53,11 @@ fun YouTubeVolumeSlider() {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("▶", color = Color(0xFFFF4E45), modifier = Modifier.width(28.dp))
             Text("YouTube 音量", color = JogColors.Text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-            Text("${s.ytVolume}%", color = JogColors.Sun1, style = MaterialTheme.typography.labelLarge)
+            Text(if (s.unifiedVolume) "統一" else "${s.ytVolume}%", color = if (s.unifiedVolume) JogColors.Faint else JogColors.Sun1, style = MaterialTheme.typography.labelLarge)
         }
         Slider(
             value = s.ytVolume.toFloat(),
+            enabled = !s.unifiedVolume,
             onValueChange = { v -> Prefs.update(ctx) { it.copy(ytVolume = (Math.round(v / 5f) * 5)) } },
             valueRange = 0f..100f,
             colors = SliderDefaults.colors(

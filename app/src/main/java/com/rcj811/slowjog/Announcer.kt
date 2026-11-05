@@ -129,7 +129,7 @@ class Announcer(context: Context, private val onReady: (() -> Unit)? = null) : T
         val t = tts
         if (t != null && chineseAvailable) {
             val params = Bundle().apply {
-                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, Prefs.settings.value.voiceVolume.coerceIn(0f, 1f))
+                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, Prefs.settings.value.voiceVol.coerceIn(0f, 1f))
             }
             t.speak(text, if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, params, "jog-${System.nanoTime()}")
         } else {
@@ -139,7 +139,7 @@ class Announcer(context: Context, private val onReady: (() -> Unit)? = null) : T
 
     fun chime(long: Boolean = false) {
         runCatching {
-            val vol = (Prefs.settings.value.voiceVolume * 100).toInt().coerceIn(0, 100)
+            val vol = (Prefs.settings.value.voiceVol * 100).toInt().coerceIn(0, 100)
             if (tone == null || toneVolume != vol) {
                 tone?.release()
                 tone = ToneGenerator(AudioManager.STREAM_MUSIC, vol)

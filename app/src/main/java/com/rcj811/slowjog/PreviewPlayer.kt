@@ -23,7 +23,7 @@ object PreviewPlayer {
         if (RunRepository.state.value.isActive) return
         stop()
         val m = Metronome().apply {
-            bpm = s.cadence; volume = s.volume; this.sound = sound; alternate = s.alternateTone
+            bpm = s.cadence; volume = s.beatVol; this.sound = sound; alternate = s.alternateTone
         }
         metronome = m
         _playing.value = sound
@@ -37,7 +37,7 @@ object PreviewPlayer {
     }
 
     fun update(s: Settings) {
-        metronome?.let { it.bpm = s.cadence; it.volume = s.volume; it.alternate = s.alternateTone }
+        metronome?.let { it.bpm = s.cadence; it.volume = s.beatVol; it.alternate = s.alternateTone }
     }
 
     fun stop() {
