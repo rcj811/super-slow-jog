@@ -182,7 +182,34 @@ class YtController(context: Context, items: List<YtItem>, shuffle: Boolean) {
         if (ready) loadCurrent()
     }
 
+    /** 播放器所在的最上層容器（整段跑步期間只掛上一次，旋轉螢幕不會拆下來） */
+    var host: FrameLayout? = null
+        private set
+
+    fun attachTo(root: FrameLayout) {
+        if (web.parent === root) { host = root; return }
+        (web.parent as? ViewGroup)?.removeView(web)
+        // 保留已算好的位置（Box 可能比這裡先完成定位）
+        val lp = (web.layoutParams as? FrameLayout.LayoutParams)
+            ?: FrameLayout.LayoutParams(1, 1, Gravity.TOP or Gravity.START)
+        root.addView(web, lp)
+        host = root
+    }
+
+    /** 移動、縮放播放器到指定位置（相對於 host） */
+    fun place(left: Int, top: Int, w: Int, h: Int) {
+        val lp = (web.layoutParams as? FrameLayout.LayoutParams) ?: FrameLayout.LayoutParams(w, h)
+        if (lp.width == w && lp.height == h && lp.leftMargin == left && lp.topMargin == top) return
+        lp.width = w
+        lp.height = h
+        lp.leftMargin = left
+        lp.topMargin = top
+        lp.gravity = Gravity.TOP or Gravity.START
+        web.layoutParams = lp
+    }
+
     fun destroy() {
+        host = null
         runCatching {
             (web.parent as? ViewGroup)?.removeView(web)
             web.stopLoading()
@@ -233,7 +260,8 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
  * 跑步畫面裡的 YouTube 播放器。
  *
  * WebView 不放在 Compose 畫面裡繪製（在 Compose 裡 WebView 影片會變成黑畫面、甚至蓋住旁邊的文字），
- * 而是加到 Activity 的最上層，位置與大小對齊這個 Box。旋轉螢幕時跟著移動，不會重新載入。
+ * 而是在跑步開始時加到 Activity 的最上層（只加一次），這個 Box 只負責告訴它位置與大小。
+ * 旋轉螢幕時直向／橫向版面會換一個 Box，但 WebView 不會被拆下，只會移動、縮放，所以畫面不會消失。
  * [hidden] 為 true（例如倒數中）時暫時隱藏，讓 Compose 的內容顯示出來。
  */
 @Composable
@@ -247,17 +275,9 @@ fun YouTubePlayerBox(
     LaunchedEffect(playing, controller.ready) { controller.setPlaying(playing) }
     LaunchedEffect(volume, controller.ready) { controller.setVolume(volume) }
 
+    val web = controller.web
     val context = LocalContext.current
     val root = remember(context) { context.findActivity()?.findViewById<FrameLayout>(android.R.id.content) }
-    val web = controller.web
-
-    DisposableEffect(root, web) {
-        if (root != null) {
-            (web.parent as? ViewGroup)?.removeView(web)
-            root.addView(web, FrameLayout.LayoutParams(1, 1, Gravity.TOP or Gravity.START))
-        }
-        onDispose { (web.parent as? ViewGroup)?.removeView(web) }
-    }
     LaunchedEffect(hidden) { web.visibility = if (hidden) View.INVISIBLE else View.VISIBLE }
 
     Box(
@@ -272,16 +292,7 @@ fun YouTubePlayerBox(
                 val h = coords.size.height.coerceAtLeast(1)
                 val left = pos.x.roundToInt() - loc[0]
                 val top = pos.y.roundToInt() - loc[1]
-                val lp = (web.layoutParams as? FrameLayout.LayoutParams)
-                    ?: FrameLayout.LayoutParams(w, h, Gravity.TOP or Gravity.START)
-                if (lp.width != w || lp.height != h || lp.leftMargin != left || lp.topMargin != top) {
-                    lp.width = w
-                    lp.height = h
-                    lp.leftMargin = left
-                    lp.topMargin = top
-                    lp.gravity = Gravity.TOP or Gravity.START
-                    web.layoutParams = lp
-                }
+                controller.place(left, top, w, h)
             },
     ) {
         if (root == null) {
@@ -331,6 +342,9 @@ private fun TrackButton(glyph: Glyph, onClick: () -> Unit) {
 fun rememberYtController(items: List<YtItem>, shuffle: Boolean): YtController {
     val ctx = LocalContext.current
     val c = remember { YtController(ctx, items, shuffle) }
-    DisposableEffect(c) { onDispose { c.destroy() } }
+    DisposableEffect(c) {
+        ctx.findActivity()?.findViewById<FrameLayout>(android.R.id.content)?.let { c.attachTo(it) }
+        onDispose { c.destroy() }
+    }
     return c
 }
