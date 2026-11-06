@@ -181,6 +181,20 @@ class CoreTest {
         assertTrue(Settings().unifiedVolume)
     }
 
+    @Test fun toneShaping() {
+        for (t in listOf(-1f, -0.5f, 0.5f, 1f)) {
+            val y = BeatSynth.get(BeatSound.METRONOME, false, t)
+            assertTrue(y.size > 100)
+            var peak = 0f
+            for (v in y) { assertTrue(v.isFinite()); peak = maxOf(peak, kotlin.math.abs(v)) }
+            assertEquals(0.9f, peak, 0.01f)
+        }
+        // 尖銳音高較高 → 樣本較短；柔和較長
+        val base = BeatSynth.get(BeatSound.WOODFISH, false, 0f).size
+        assertTrue(BeatSynth.get(BeatSound.WOODFISH, false, 1f).size < base)
+        assertTrue(BeatSynth.get(BeatSound.WOODFISH, false, -1f).size > base)
+    }
+
     @Test fun mascotIds() {
         assertEquals(Mascot.CAPYBARA, Mascot.fromId("CAPYBARA"))
         assertEquals(Mascot.DUCK, Mascot.fromId("unknown"))

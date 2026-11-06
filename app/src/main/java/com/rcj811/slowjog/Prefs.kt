@@ -42,6 +42,8 @@ data class Settings(
     val voiceVolume: Float = 1.0f,
     val beatSound: BeatSound = BeatSound.METRONOME,
     val alternateTone: Boolean = true,
+    /** 節拍音色：-1 柔和 … 0 原音 … +1 尖銳 */
+    val beatTone: Float = 0f,
     val voiceOn: Boolean = true,
     val voiceGender: VoiceGender = VoiceGender.FEMALE,
     /** 指定的 TTS 聲音名稱；空字串 = 依男女聲自動挑選；FIRST_VOICE = 清單第一個（台灣優先） */
@@ -117,6 +119,7 @@ object Prefs {
             voiceVolume = p.getFloat("voiceVolume", d.voiceVolume).coerceIn(0f, 1f),
             beatSound = BeatSound.fromId(p.getString("beatSound", d.beatSound.name)),
             alternateTone = p.getBoolean("alternateTone", d.alternateTone),
+            beatTone = p.getFloat("beatTone", d.beatTone).coerceIn(-1f, 1f),
             voiceOn = p.getBoolean("voiceOn", d.voiceOn),
             voiceGender = runCatching {
                 VoiceGender.valueOf(p.getString("voiceGender", d.voiceGender.name)!!)
@@ -168,6 +171,7 @@ object Prefs {
             .putFloat("voiceVolume", s.voiceVolume)
             .putString("beatSound", s.beatSound.name)
             .putBoolean("alternateTone", s.alternateTone)
+            .putFloat("beatTone", s.beatTone)
             .putBoolean("voiceOn", s.voiceOn)
             .putString("voiceGender", s.voiceGender.name)
             .putString("voiceName", s.voiceName)

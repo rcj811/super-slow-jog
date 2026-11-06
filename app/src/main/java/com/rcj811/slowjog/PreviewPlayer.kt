@@ -23,12 +23,12 @@ object PreviewPlayer {
         if (RunRepository.state.value.isActive) return
         stop()
         val m = Metronome().apply {
-            bpm = s.cadence; volume = s.beatVol; this.sound = sound; alternate = s.alternateTone
+            bpm = s.cadence; volume = s.beatVol; this.sound = sound; alternate = s.alternateTone; tone = s.beatTone
         }
         metronome = m
         _playing.value = sound
         scope.launch(Dispatchers.Default) {
-            BeatSynth.get(sound, false); BeatSynth.get(sound, true)
+            BeatSynth.get(sound, false, s.beatTone); BeatSynth.get(sound, true, s.beatTone)
             if (metronome === m) m.start()
         }
         if (millis > 0) {

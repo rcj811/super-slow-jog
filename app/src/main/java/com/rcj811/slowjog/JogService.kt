@@ -87,7 +87,7 @@ class JogService : Service() {
         startWallMs = System.currentTimeMillis()
 
         val m = Metronome().apply {
-            bpm = s.cadence; volume = s.beatVol; sound = s.beatSound; alternate = s.alternateTone
+            bpm = s.cadence; volume = s.beatVol; sound = s.beatSound; alternate = s.alternateTone; tone = s.beatTone
         }
         metronome?.stop()
         metronome = m
@@ -96,7 +96,7 @@ class JogService : Service() {
         runJob?.cancel()
         runJob = scope.launch {
             // 預先合成音色（背景執行緒）
-            launch(Dispatchers.Default) { BeatSynth.get(s.beatSound, false); BeatSynth.get(s.beatSound, true) }
+            launch(Dispatchers.Default) { BeatSynth.get(s.beatSound, false, s.beatTone); BeatSynth.get(s.beatSound, true, s.beatTone) }
             if (s.countdownOn) {
                 for (n in Settings.COUNTDOWN_SEC downTo 1) {
                     RunRepository.set(RunState(phase = Phase.COUNTDOWN, countdown = n, targetMin = s.durationMin, cadence = s.cadence))
@@ -297,10 +297,11 @@ class JogService : Service() {
                 metronome?.let {
                     it.volume = s.beatVol
                     it.alternate = s.alternateTone
-                    if (it.sound != s.beatSound) {
+                    if (it.sound != s.beatSound || it.tone != s.beatTone) {
                         launch(Dispatchers.Default) {
-                            BeatSynth.get(s.beatSound, false); BeatSynth.get(s.beatSound, true)
+                            BeatSynth.get(s.beatSound, false, s.beatTone); BeatSynth.get(s.beatSound, true, s.beatTone)
                             it.sound = s.beatSound
+                            it.tone = s.beatTone
                         }
                     }
                 }

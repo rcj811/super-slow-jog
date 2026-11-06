@@ -30,6 +30,8 @@ class Metronome {
     @Volatile var bpm: Int = 180
     @Volatile var volume: Float = 0.8f
     @Volatile var sound: BeatSound = BeatSound.WATER
+    /** 音色 -1（柔和）… +1（尖銳） */
+    @Volatile var tone: Float = 0f
     @Volatile var alternate: Boolean = true
     @Volatile var paused: Boolean = false
         set(value) {
@@ -91,7 +93,7 @@ class Metronome {
             .build()
 
         // 預先合成音色，避免第一拍延遲
-        BeatSynth.get(sound, false); BeatSynth.get(sound, true)
+        BeatSynth.get(sound, false, tone); BeatSynth.get(sound, true, tone)
 
         track.play()
         val chunk = ShortArray(sr / 100) // 10 ms
@@ -112,7 +114,7 @@ class Metronome {
                     val frame = framesWritten + i
                     if (!isPaused && frame >= nextBeatAt) {
                         val alt = alternate && beatIndex % 2 == 1L
-                        voices.add(Voice(BeatSynth.get(sound, alt), 0))
+                        voices.add(Voice(BeatSynth.get(sound, alt, tone), 0))
                         if (voices.size > 6) voices.removeAt(0)
                         // 估計這一拍實際從喇叭播出的時間
                         val head = track.playbackHeadPosition.toLong() and 0xFFFFFFFFL

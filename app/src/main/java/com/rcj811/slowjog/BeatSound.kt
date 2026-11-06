@@ -26,12 +26,61 @@ enum class BeatSound(val label: String, val desc: String) {
 object BeatSynth {
     const val SAMPLE_RATE = 44100
 
-    private val cache = HashMap<Pair<BeatSound, Boolean>, FloatArray>()
+    private data class Key(val sound: BeatSound, val alt: Boolean, val tone: Int)
+    private val cache = HashMap<Key, FloatArray>()
 
-    /** 取得音色樣本（-1..1）。[alt] = 另一隻腳的音高。 */
+    /**
+     * 取得音色樣本（-1..1）。[alt] = 另一隻腳的音高。
+     * [tone]：音色 -1（柔和）… 0（原音）… +1（尖銳），以 0.1 為一格。
+     */
     @Synchronized
-    fun get(sound: BeatSound, alt: Boolean): FloatArray =
-        cache.getOrPut(sound to alt) { render(sound, alt) }
+    fun get(sound: BeatSound, alt: Boolean, tone: Float = 0f): FloatArray {
+        val q = Math.round(tone.coerceIn(-1f, 1f) * 10f)
+        return cache.getOrPut(Key(sound, alt, q)) {
+            val base = if (q == 0) render(sound, alt) else get(sound, alt, 0f)
+            if (q == 0) base else shapeTone(base, q / 10f)
+        }
+    }
+
+    /**
+     * 音色調整：
+     * - 柔和：音高降低（最多約半個八度）＋ 低通濾波（越柔和越悶、越圓潤）
+     * - 尖銳：音高升高（最多約半個八度）＋ 高頻強調（越尖銳越清脆）
+     */
+    fun shapeTone(x: FloatArray, t: Float): FloatArray {
+        val pitch = Math.pow(2.0, t * 0.6)
+        val n = (x.size / pitch).toInt().coerceAtLeast(32)
+        val y = FloatArray(n) { i ->
+            val pos = i * pitch
+            val j = pos.toInt()
+            val f = (pos - j).toFloat()
+            when {
+                j + 1 < x.size -> x[j] * (1 - f) + x[j + 1] * f
+                j < x.size -> x[j]
+                else -> 0f
+            }
+        }
+        if (t < 0f) {
+            // 兩級一階低通：截止頻率由 9 kHz（原音）降到約 600 Hz（最柔和）
+            val fc = 9000.0 * Math.pow(600.0 / 9000.0, (-t).toDouble())
+            val a = exp(-2 * PI * fc / SAMPLE_RATE).toFloat()
+            repeat(2) {
+                var prev = 0f
+                for (i in y.indices) { prev = (1 - a) * y[i] + a * prev; y[i] = prev }
+            }
+            // 起音稍微變圓（最多 4 ms 淡入）
+            val att = (SAMPLE_RATE * 0.004 * -t).toInt()
+            for (i in 0 until min(att, y.size)) y[i] *= i.toFloat() / att
+        } else {
+            // 高頻強調（一階差分），越尖銳越清脆
+            val k = t * 1.8f
+            var prev = 0f
+            for (i in y.indices) { val v = y[i]; y[i] = v + k * (v - prev); prev = v }
+        }
+        fadeOut(y, 0.015)
+        normalize(y, 0.9f)
+        return y
+    }
 
     fun render(sound: BeatSound, alt: Boolean): FloatArray {
         val k = if (alt) 0.84 else 1.0 // 另一隻腳：約低小三度

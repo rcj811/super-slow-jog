@@ -161,6 +161,7 @@ fun SettingsScreen() {
                     if (row.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
+            ToneSlider()
             SwitchRow("左右腳不同音高", "幫助分辨左右腳節奏", s.alternateTone) { v -> Prefs.update(ctx) { it.copy(alternateTone = v) } }
         }
 
@@ -333,6 +334,50 @@ private fun ResetCard() {
             },
             dismissButton = { TextButton(onClick = { confirm = null }) { Text("取消", color = JogColors.Text) } },
         )
+    }
+}
+
+/** 音色拉桿：柔和 ←→ 尖銳 */
+@Composable
+private fun ToneSlider() {
+    val ctx = LocalContext.current
+    val s by Prefs.settings.collectAsStateWithLifecycle()
+    val t = s.beatTone
+    val pct = Math.round(kotlin.math.abs(t) * 100)
+    Column(Modifier.padding(bottom = 6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("音色", color = JogColors.Text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Text(
+                when {
+                    kotlin.math.abs(t) < 0.05f -> "原音"
+                    t < 0 -> "柔和 $pct%"
+                    else -> "尖銳 $pct%"
+                },
+                color = JogColors.Sun1, style = MaterialTheme.typography.labelLarge,
+            )
+        }
+        Slider(
+            value = t,
+            onValueChange = { v -> Prefs.update(ctx) { it.copy(beatTone = Math.round(v * 10f) / 10f) } },
+            onValueChangeFinished = { PreviewPlayer.play(Prefs.settings.value, millis = 1800) },
+            valueRange = -1f..1f,
+            steps = 19,
+            colors = sliderColors(),
+        )
+        Row {
+            Text("◀ 柔和・低沉", color = JogColors.Muted, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+            Text(
+                "原音", color = JogColors.Faint, style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable {
+                    Prefs.update(ctx) { it.copy(beatTone = 0f) }
+                    PreviewPlayer.play(Prefs.settings.value, millis = 1800)
+                }.padding(horizontal = 8.dp),
+            )
+            Text(
+                "尖銳・清脆 ▶", color = JogColors.Muted, style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End,
+            )
+        }
     }
 }
 
