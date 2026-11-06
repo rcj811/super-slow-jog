@@ -16,7 +16,15 @@ enum class BeatSound(val label: String, val desc: String) {
     KALIMBA("拇指琴", "空靈清亮的拇指琴音"),
     BAMBOO("竹筒", "輕敲竹筒的空心「叩叩」聲"),
     BOWL("頌缽", "悠長的鈴缽，適合低步頻放鬆跑"),
-    DRUM("輕鼓", "低沉的咚咚聲，像踏在地上的腳步");
+    DRUM("輕鼓", "低沉的咚咚聲，像踏在地上的腳步"),
+    ROWING("划船槳", "槳划進水裡的「刷—嘩」聲"),
+    TUG("拔河", "左腳「嘿」、右腳「咻」的拔河口號"),
+    CLAP("拍手", "清脆的拍手聲，像有人幫你打拍子"),
+    HOOF("馬蹄", "「喀搭喀搭」的馬蹄聲"),
+    COWBELL("牛鈴", "鄉間牛鈴，明亮有穿透力"),
+    TRIANGLE("三角鐵", "叮—清亮悠長的三角鐵"),
+    STEP("碎石踏步", "踩在碎石路上的沙沙腳步聲"),
+    BUBBLE("泡泡", "可愛的「啵」泡泡聲");
 
     companion object {
         fun fromId(id: String?): BeatSound = entries.firstOrNull { it.name == id } ?: METRONOME
@@ -131,10 +139,151 @@ object BeatSynth {
                 mixInto(x, noiseBurst(rnd, 0.35, 0.004, 0.5), 0.1)
                 reverb(x, 0.12, 0.1)
             }
+            BeatSound.ROWING -> {
+                val n = (SAMPLE_RATE * 0.45).toInt()
+                val swish = bandSweep(noise(rnd, n), 2600.0 * k, 700.0 * k, 0.06, 1.6)
+                applyEnv(swish, 0.012, 0.09)
+                val splash = band(noise(rnd, n), 3800.0 * k, 0.9)
+                applyEnv(splash, 0.002, 0.035)
+                val x = modal(160.0 * k, doubleArrayOf(1.0), doubleArrayOf(1.0), doubleArrayOf(0.06), 0.45, attack = 0.004, glide = -0.3, glideTau = 0.03)
+                for (i in x.indices) x[i] = (0.5 * x[i] + swish[i] + 0.35 * splash[i]).toFloat()
+                reverb(x, 0.3, 0.2)
+            }
+            BeatSound.TUG -> {
+                val x = if (!alt) heyVowel(rnd) else {
+                    val n = (SAMPLE_RATE * 0.22).toInt()
+                    val f = bandSweep(noise(rnd, n), 2600.0, 5200.0, 0.08, 2.5)
+                    applyEnv(f, 0.02, 0.07); f
+                }
+                reverb(x, 0.18, 0.15)
+            }
+            BeatSound.CLAP -> {
+                val n = (SAMPLE_RATE * 0.25).toInt()
+                val x = FloatArray(n)
+                doubleArrayOf(0.0, 0.009, 0.019).forEachIndexed { j, d ->
+                    val s0 = (d * SAMPLE_RATE).toInt()
+                    val b = band(noise(rnd, n - s0), 1300.0 * k, 1.4)
+                    applyEnv(b, 0.0005, if (j < 2) 0.006 else 0.03)
+                    for (i in b.indices) x[s0 + i] += b[i]
+                }
+                reverb(x, 0.25, 0.15)
+            }
+            BeatSound.HOOF -> {
+                val click = modal(2200.0 * k, doubleArrayOf(1.0, 1.5), doubleArrayOf(1.0, 0.5), doubleArrayOf(0.006, 0.004), 0.25, attack = 0.0003)
+                val x = modal(420.0 * k, doubleArrayOf(1.0, 2.3), doubleArrayOf(1.0, 0.3), doubleArrayOf(0.05, 0.02), 0.25, attack = 0.001)
+                mixInto(x, click, 0.6)
+                val n2 = band(noise(rnd, x.size), 1800.0, 1.0); applyEnv(n2, 0.0005, 0.01)
+                mixInto(x, n2, 0.15)
+                reverb(x, 0.15, 0.1)
+            }
+            BeatSound.COWBELL -> {
+                val f = 560.0 * k
+                val raw = modal(f, doubleArrayOf(1.0, 1.504, 2.03, 2.78), doubleArrayOf(1.0, 0.8, 0.3, 0.2), doubleArrayOf(0.18, 0.12, 0.05, 0.03), 0.5, attack = 0.0008)
+                val x = band(raw, f * 1.3, 0.8)
+                reverb(x, 0.18, 0.15)
+            }
+            BeatSound.TRIANGLE -> {
+                val x = modal(2100.0 * k, doubleArrayOf(1.0, 1.35, 2.11, 2.67, 3.4), doubleArrayOf(1.0, 0.5, 0.45, 0.3, 0.2), doubleArrayOf(0.7, 0.5, 0.35, 0.25, 0.15), 0.9, attack = 0.0005)
+                reverb(x, 0.2, 0.2)
+            }
+            BeatSound.STEP -> {
+                val n = (SAMPLE_RATE * 0.18).toInt()
+                val x = modal(90.0 * k, doubleArrayOf(1.0), doubleArrayOf(0.8), doubleArrayOf(0.04), 0.18, attack = 0.002)
+                for (j in 0 until 7) {
+                    val s0 = (SAMPLE_RATE * (0.006 * j + 0.002 * rnd.nextDouble())).toInt()
+                    val b = band(noise(rnd, n - s0), 2500.0 * k + 800.0 * rnd.nextDouble(), 2.0)
+                    applyEnv(b, 0.0003, 0.008)
+                    val g = (1.0 - j * 0.1).toFloat()
+                    for (i in b.indices) x[s0 + i] += b[i] * g
+                }
+                reverb(x, 0.1, 0.08)
+            }
+            BeatSound.BUBBLE -> {
+                val n = (SAMPLE_RATE * 0.12).toInt()
+                val x = FloatArray(n)
+                var ph = 0.0
+                for (i in 0 until n) {
+                    val t = i.toDouble() / SAMPLE_RATE
+                    ph += 2 * PI * 900.0 * k * (1 + 1.2 * t / 0.12) / SAMPLE_RATE
+                    x[i] = (sin(ph) * min(1.0, t / 0.003) * exp(-t / 0.03)).toFloat()
+                }
+                reverb(x, 0.3, 0.2)
+            }
         }
         fadeOut(y, 0.02)
         normalize(y, 0.9f)
         return y
+    }
+
+    // ---- 新音色用的工具 ----
+
+    private fun noise(rnd: Random, n: Int) = FloatArray(n.coerceAtLeast(0)) { gaussian(rnd).toFloat() }
+
+    private fun applyEnv(x: FloatArray, attack: Double, tau: Double) {
+        for (i in x.indices) {
+            val t = i.toDouble() / SAMPLE_RATE
+            val a = if (attack > 0) min(1.0, t / attack) else 1.0
+            x[i] = (x[i] * a * exp(-t / tau)).toFloat()
+        }
+    }
+
+    /** 帶通濾波（RBJ biquad，0 dB 峰值） */
+    private fun band(x: FloatArray, f0: Double, q: Double): FloatArray {
+        val w = 2 * PI * f0 / SAMPLE_RATE
+        val al = sin(w) / (2 * q)
+        val c = kotlin.math.cos(w)
+        val a0 = 1 + al
+        val y = FloatArray(x.size)
+        var x1 = 0.0; var x2 = 0.0; var y1 = 0.0; var y2 = 0.0
+        for (i in x.indices) {
+            val v = x[i].toDouble()
+            val o = (al * v - al * x2 + 2 * c * y1 - (1 - al) * y2) / a0
+            x2 = x1; x1 = v; y2 = y1; y1 = o
+            y[i] = o.toFloat()
+        }
+        return y
+    }
+
+    /** 中心頻率隨時間由 fStart 指數滑向 fEnd 的帶通濾波 */
+    private fun bandSweep(x: FloatArray, fStart: Double, fEnd: Double, tau: Double, q: Double): FloatArray {
+        val y = FloatArray(x.size)
+        var x1 = 0.0; var x2 = 0.0; var y1 = 0.0; var y2 = 0.0
+        for (i in x.indices) {
+            val t = i.toDouble() / SAMPLE_RATE
+            val f0 = fEnd + (fStart - fEnd) * exp(-t / tau)
+            val w = 2 * PI * f0 / SAMPLE_RATE
+            val al = sin(w) / (2 * q)
+            val c = kotlin.math.cos(w)
+            val v = x[i].toDouble()
+            val o = (al * v - al * x2 + 2 * c * y1 - (1 - al) * y2) / (1 + al)
+            x2 = x1; x1 = v; y2 = y1; y1 = o
+            y[i] = o.toFloat()
+        }
+        return y
+    }
+
+    /** 拔河的「嘿」：鋸齒波聲帶 + 三個共振峰 */
+    private fun heyVowel(rnd: Random): FloatArray {
+        val n = (SAMPLE_RATE * 0.24).toInt()
+        val src = FloatArray(n)
+        var ph = 0.0
+        var prev = 0.0
+        for (i in 0 until n) {
+            val t = i.toDouble() / SAMPLE_RATE
+            ph += 150.0 * (1 + 0.25 * exp(-t / 0.05)) / SAMPLE_RATE
+            val saw = (ph % 1.0) * 2 - 1
+            src[i] = (saw - 0.9 * prev).toFloat()
+            prev = saw
+        }
+        val f1 = band(src, 530.0, 6.0)
+        val f2 = band(src, 1850.0, 9.0)
+        val f3 = band(src, 2600.0, 10.0)
+        val x = FloatArray(n) { f1[it] + 0.8f * f2[it] + 0.35f * f3[it] }
+        applyEnv(x, 0.012, 0.11)
+        val breath = band(noise(rnd, n), 3000.0, 2.0)
+        applyEnv(breath, 0.002, 0.02)
+        mixInto(x, breath, 0.15)
+        return x
     }
 
     // ---- 合成工具 ----
