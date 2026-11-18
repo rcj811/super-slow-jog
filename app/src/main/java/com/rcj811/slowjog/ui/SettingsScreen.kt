@@ -23,6 +23,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import com.rcj811.slowjog.AppUpdater
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
@@ -262,6 +263,26 @@ fun SettingsScreen() {
             )
             HorizontalDivider(Modifier.padding(vertical = 8.dp), color = JogColors.Line)
             SwitchRow("跑步時螢幕保持開啟", "關閉後鎖螢幕也會繼續計時與播放節拍", s.keepScreenOn) { v -> Prefs.update(ctx) { it.copy(keepScreenOn = v) } }
+        }
+
+        // ---- 版本與更新 ----
+        JogCard {
+            SectionLabel("版本")
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "目前版本 ${remember { AppUpdater.currentVersion(ctx) }}",
+                    color = JogColors.Text, style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = { (ctx as? android.app.Activity)?.let { AppUpdater.check(it, manual = true) } }) {
+                    Text("檢查更新")
+                }
+            }
+            Text(
+                "每次開啟 App 會自動檢查，有新版會顯示更新內容，按一下即可更新。",
+                color = JogColors.Faint, style = MaterialTheme.typography.bodyMedium,
+            )
         }
 
         // ---- 清除資料 ----

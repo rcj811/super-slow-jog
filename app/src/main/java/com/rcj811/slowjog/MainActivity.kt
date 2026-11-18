@@ -34,6 +34,7 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
+        CrashGuard.install(this)
         Prefs.load(this)
         SessionStore.load(this)
         AvatarStore.load(this)
@@ -54,6 +55,8 @@ class MainActivity : ComponentActivity() {
                 AppRoot(onStart = ::startRun)
             }
         }
+        CrashGuard.showIfAny(this)
+        AppUpdater.check(this)   // 每次開啟檢查新版
     }
 
     private fun applyOrientation(mode: ScreenMode) {
